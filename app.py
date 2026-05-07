@@ -1,6 +1,7 @@
 """
 Streamlit-приложение: анализ аномального потребления.
-Эстетика: editorial dark, диспетчерская энергосистемы.
+Эстетика: editorial dark, диспетчерская энергосистемы, расширенная палитра.
+CSS жёстко перекрывает дефолты — config.toml желателен, но не обязателен.
 """
 import streamlit as st
 import pandas as pd
@@ -58,40 +59,59 @@ FLAG_TITLES = {
     'аномалия_в_когорте':   'Аномалия в когорте',
 }
 
+# Цвет на флаг — расширенная палитра
+FLAG_COLOR = {
+    'подозрение_хищение':   '#ff6b6b',  # коралл
+    'долгое_молчание':      '#a78bfa',  # лиловый
+    'превышение_мощности':  '#f5d442',  # электр. жёлтый
+    'нестабильность':       '#5eead4',  # бирюза
+    'одинаковые_подряд':    '#fb923c',  # янтарь
+    'аномалия_в_когорте':   '#f472b6',  # розовый
+}
+
 # =====================================================================
-# СТИЛИ
+# СТИЛИ — жёстко перекрывают дефолты Streamlit
 # =====================================================================
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800;9..144,900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
 
 :root {
     --bg: #0a0b0f;
-    --surface: #13141a;
-    --surface-2: #1c1d24;
-    --border: #262830;
-    --border-soft: #1c1d24;
-    --text: #e8e9ed;
-    --text-dim: #8a8d99;
-    --text-faint: #5a5d68;
-    --accent: #f5d442;
-    --accent-dim: #c9ad36;
-    --danger: #ff7b72;
-    --good: #6dcf91;
+    --bg-glow: #14151d;
+    --surface: #14151c;
+    --surface-2: #1c1d26;
+    --border: #2a2c38;
+    --border-soft: #1f2029;
+    --text: #ececf0;
+    --text-dim: #8e91a0;
+    --text-faint: #5a5d6a;
+
+    --accent: #f5d442;          /* электрический жёлтый */
+    --accent-glow: #fde047;
+    --coral: #ff6b6b;           /* для опасности */
+    --mint: #5eead4;            /* для нормы */
+    --lilac: #a78bfa;           /* для нейтрального */
+    --amber: #fb923c;           /* для предупреждения */
+    --rose: #f472b6;            /* для редкого */
 }
 
-html, body, [class*="css"] {
-    font-family: 'Manrope', system-ui, sans-serif !important;
+/* фон с лёгким свечением сверху */
+.stApp {
+    background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(245, 212, 66, 0.08), transparent 70%),
+        radial-gradient(ellipse 60% 40% at 100% 0%, rgba(167, 139, 250, 0.06), transparent 60%),
+        var(--bg) !important;
+}
+
+html, body, [class*="css"], .stApp, .stApp * {
+    font-family: 'Manrope', system-ui, sans-serif;
     color: var(--text);
 }
 
-.stApp { background: var(--bg); }
-
-/* убрать дефолтный header Streamlit */
-header[data-testid="stHeader"] { background: transparent; }
-.stDeployButton { display: none; }
-#MainMenu { visibility: hidden; }
-footer { visibility: hidden; }
+/* шапка / тулбар */
+header[data-testid="stHeader"] { background: transparent !important; }
+.stDeployButton, #MainMenu, footer { display: none !important; visibility: hidden !important; }
 
 /* типографика */
 h1, h2, h3, .display-font {
@@ -106,241 +126,363 @@ h3 { font-size: 1.2rem !important; }
 
 .mono { font-family: 'JetBrains Mono', monospace !important; }
 
-/* шапка — журнальный стиль */
+/* ============ HERO ============ */
 .hero {
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
-    padding: 1.4rem 0;
-    margin-bottom: 1.8rem;
+    padding: 1.6rem 0;
+    margin: 0.5rem 0 2rem 0;
     display: flex;
     justify-content: space-between;
     align-items: baseline;
     gap: 2rem;
 }
 .hero-title {
-    font-family: 'Fraunces', serif;
+    font-family: 'Fraunces', serif !important;
     font-weight: 800;
-    font-size: 2.6rem;
-    letter-spacing: -0.03em;
-    line-height: 1;
+    font-size: 3rem;
+    letter-spacing: -0.035em;
+    line-height: 0.95;
     margin: 0;
+    color: var(--text);
 }
 .hero-title em {
     font-style: italic;
     font-weight: 300;
-    color: var(--accent);
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-glow) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 .hero-meta {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.72rem;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.7rem;
     color: var(--text-dim);
     text-transform: uppercase;
-    letter-spacing: 0.15em;
+    letter-spacing: 0.18em;
     text-align: right;
-    line-height: 1.6;
+    line-height: 1.7;
     white-space: nowrap;
 }
 .hero-meta b { color: var(--accent); font-weight: 500; }
 
-/* лента метрик — без плиток, как в газете */
+/* ============ ЛЕНТА МЕТРИК ============ */
 .metric-strip {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 0;
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
     margin-bottom: 2rem;
+    overflow: hidden;
 }
 .metric-cell {
-    padding: 1.2rem 1.4rem;
+    padding: 1.4rem 1.6rem;
     border-right: 1px solid var(--border);
+    position: relative;
 }
 .metric-cell:last-child { border-right: none; }
+.metric-cell::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--cell-accent, transparent);
+}
 .metric-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.68rem;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.66rem;
     text-transform: uppercase;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.2em;
     color: var(--text-dim);
-    margin-bottom: 0.45rem;
+    margin-bottom: 0.5rem;
 }
 .metric-value {
-    font-family: 'Fraunces', serif;
+    font-family: 'Fraunces', serif !important;
     font-weight: 600;
-    font-size: 2.4rem;
+    font-size: 2.6rem;
     line-height: 1;
     color: var(--text);
 }
 .metric-value.accent { color: var(--accent); }
+.metric-value.coral  { color: var(--coral); }
+.metric-value.mint   { color: var(--mint); }
 
-/* секционные заголовки */
+/* ============ СЕКЦИОННЫЕ ЗАГОЛОВКИ ============ */
 .section-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.7rem;
     text-transform: uppercase;
-    letter-spacing: 0.22em;
-    color: var(--text-dim);
-    margin: 2rem 0 0.6rem 0;
+    letter-spacing: 0.25em;
+    color: var(--accent);
+    margin: 2rem 0 0.4rem 0;
     padding-bottom: 0.5rem;
     border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+.section-label::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--accent);
 }
 .section-title {
-    font-family: 'Fraunces', serif;
+    font-family: 'Fraunces', serif !important;
     font-weight: 600;
-    font-size: 1.5rem;
+    font-size: 1.6rem;
     line-height: 1.1;
-    margin: 0.2rem 0 1.2rem 0;
+    margin: 0.3rem 0 1.3rem 0;
+    color: var(--text);
 }
 
-/* флаги — карточки */
+/* ============ ФЛАГИ ============ */
 .flag-row {
     display: flex;
     align-items: center;
-    gap: 0.7rem;
-    padding: 0.6rem 0.8rem;
-    margin-bottom: 0.4rem;
-    background: var(--surface);
-    border-left: 3px solid var(--accent);
+    gap: 0.8rem;
+    padding: 0.7rem 1rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(90deg, var(--flag-color, var(--accent))15 0%, var(--surface) 30%);
+    border-left: 3px solid var(--flag-color, var(--accent));
     border-radius: 2px;
+    transition: transform 0.15s ease;
 }
-.flag-row .emoji { font-size: 1.05rem; }
-.flag-row .name { font-weight: 500; color: var(--text); }
+.flag-row:hover { transform: translateX(4px); }
+.flag-row .emoji { font-size: 1.1rem; }
+.flag-row .name { font-weight: 500; color: var(--text); font-size: 0.95rem; }
 .flag-empty {
-    padding: 0.7rem 0.9rem;
-    color: var(--good);
-    background: rgba(109, 207, 145, 0.07);
-    border-left: 3px solid var(--good);
+    padding: 0.9rem 1.1rem;
+    color: var(--mint);
+    background: linear-gradient(90deg, rgba(94, 234, 212, 0.1), rgba(94, 234, 212, 0.02));
+    border-left: 3px solid var(--mint);
     border-radius: 2px;
+    font-weight: 500;
 }
 
-/* карточка-список */
+/* ============ KEY-VALUE СПИСОК ============ */
 .kv-list { font-family: 'Manrope', sans-serif; }
 .kv-row {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    padding: 0.5rem 0;
+    padding: 0.55rem 0;
     border-bottom: 1px dashed var(--border-soft);
     gap: 1rem;
 }
 .kv-row:last-child { border-bottom: none; }
-.kv-key {
-    color: var(--text-dim);
-    font-size: 0.85rem;
-}
+.kv-key { color: var(--text-dim); font-size: 0.86rem; }
 .kv-val {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.92rem;
     color: var(--text);
     text-align: right;
     word-break: break-word;
 }
 
-/* таблицы */
-[data-testid="stDataFrame"] {
-    border: 1px solid var(--border);
-    border-radius: 2px;
-}
-
-/* tabs */
+/* ============ ТАБЫ ============ */
 .stTabs [data-baseweb="tab-list"] {
     gap: 0;
     border-bottom: 1px solid var(--border);
+    background: transparent;
 }
 .stTabs [data-baseweb="tab"] {
     font-family: 'JetBrains Mono', monospace !important;
-    font-size: 0.75rem !important;
+    font-size: 0.78rem !important;
     text-transform: uppercase;
-    letter-spacing: 0.15em;
-    padding: 0.8rem 1.2rem;
+    letter-spacing: 0.18em;
+    padding: 0.85rem 1.4rem;
     color: var(--text-dim);
     background: transparent;
+    border: none;
     border-bottom: 2px solid transparent;
+    transition: color 0.2s;
 }
+.stTabs [data-baseweb="tab"]:hover { color: var(--text); }
 .stTabs [aria-selected="true"] {
     color: var(--accent) !important;
     border-bottom-color: var(--accent) !important;
+    background: linear-gradient(180deg, transparent 50%, rgba(245, 212, 66, 0.05));
 }
 
-/* sidebar */
+/* ============ САЙДБАР ============ */
 [data-testid="stSidebar"] {
-    background: var(--surface);
+    background: var(--surface) !important;
     border-right: 1px solid var(--border);
 }
 [data-testid="stSidebar"] h1 {
     font-family: 'Fraunces', serif !important;
-    font-size: 1.4rem !important;
-    margin-bottom: 0.4rem;
+    font-size: 1.6rem !important;
+    margin-bottom: 0.5rem;
+    color: var(--text);
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    margin-bottom: 0.5rem;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary {
+    font-family: 'Manrope', sans-serif !important;
+    font-weight: 500;
+    color: var(--text);
 }
 
-/* кнопки */
+/* ============ СЛАЙДЕРЫ — ЖЁЛТЫЕ ============ */
+/* активная часть трека */
+.stSlider [data-baseweb="slider"] > div > div > div {
+    background: var(--accent) !important;
+}
+/* ползунок */
+.stSlider [role="slider"] {
+    background-color: var(--accent) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 4px rgba(245, 212, 66, 0.15) !important;
+}
+/* подпись со значением (всплывает над ползунком) */
+.stSlider [data-baseweb="tooltip"] > div {
+    background: var(--accent) !important;
+    color: var(--bg) !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-weight: 500;
+}
+/* числовое значение под ползунком */
+.stSlider [data-testid="stTickBarMin"],
+.stSlider [data-testid="stTickBarMax"] {
+    color: var(--text-faint) !important;
+    font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* number input */
+.stNumberInput input {
+    background: var(--bg) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    font-family: 'JetBrains Mono', monospace !important;
+}
+.stNumberInput button {
+    background: var(--surface-2) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+}
+
+/* select */
+.stSelectbox > div > div, .stMultiSelect > div > div {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+}
+
+/* ============ КНОПКИ ============ */
 .stDownloadButton button, .stButton button {
     background: var(--accent) !important;
     color: var(--bg) !important;
     border: none !important;
     font-family: 'JetBrains Mono', monospace !important;
+    font-weight: 600 !important;
     font-size: 0.78rem !important;
     text-transform: uppercase;
-    letter-spacing: 0.15em;
-    padding: 0.6rem 1.4rem !important;
-    border-radius: 2px !important;
+    letter-spacing: 0.16em;
+    padding: 0.7rem 1.6rem !important;
+    border-radius: 3px !important;
+    transition: transform 0.1s, box-shadow 0.2s;
 }
 .stDownloadButton button:hover, .stButton button:hover {
-    background: #ffe055 !important;
+    background: var(--accent-glow) !important;
+    box-shadow: 0 0 24px rgba(245, 212, 66, 0.3);
+    transform: translateY(-1px);
 }
 
 /* file uploader */
 [data-testid="stFileUploaderDropzone"] {
     background: var(--surface) !important;
     border: 1px dashed var(--border) !important;
-    border-radius: 2px !important;
+    border-radius: 4px !important;
+    transition: border-color 0.2s, background 0.2s;
+}
+[data-testid="stFileUploaderDropzone"]:hover {
+    border-color: var(--accent) !important;
+    background: var(--surface-2) !important;
+}
+[data-testid="stFileUploaderDropzone"] button {
+    background: var(--accent) !important;
+    color: var(--bg) !important;
 }
 
-/* status-pills для отчёта о загрузке */
+/* dataframe */
+[data-testid="stDataFrame"] {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+/* ============ PILLS ============ */
 .pill {
     display: inline-block;
-    padding: 0.18rem 0.55rem;
+    padding: 0.22rem 0.7rem;
     border-radius: 2px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.72rem;
-    margin: 0.15rem 0.2rem 0.15rem 0;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.74rem;
+    margin: 0.18rem 0.22rem 0.18rem 0;
     border: 1px solid var(--border);
+    background: var(--surface);
 }
-.pill.found { color: var(--good); border-color: rgba(109, 207, 145, 0.3); }
+.pill.found { color: var(--mint); border-color: rgba(94, 234, 212, 0.3); }
 .pill.miss  { color: var(--text-dim); }
 
-/* инфо-блоки заглушек */
+/* ============ ЗАГЛУШКА ============ */
 .empty-state {
     border: 1px dashed var(--border);
-    padding: 2.5rem;
+    padding: 3rem 2rem;
     text-align: center;
     color: var(--text-dim);
-    font-family: 'Fraunces', serif;
+    font-family: 'Fraunces', serif !important;
     font-style: italic;
-    font-size: 1.1rem;
+    font-size: 1.2rem;
     margin: 1rem 0;
+    background: linear-gradient(180deg, var(--surface) 0%, transparent 100%);
+    border-radius: 4px;
+}
+
+/* ============ ПОДВАЛ ============ */
+.footer-strip {
+    margin-top: 3rem;
+    padding: 1.2rem 0;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.7rem;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    text-align: center;
 }
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
 
 # =====================================================================
-# Plotly-тема под общий стиль
+# Plotly-тема
 # =====================================================================
 PLOTLY_LAYOUT = dict(
     paper_bgcolor='rgba(0,0,0,0)',
     plot_bgcolor='rgba(0,0,0,0)',
-    font=dict(family='JetBrains Mono, monospace', color='#8a8d99', size=11),
-    xaxis=dict(gridcolor='#1c1d24', linecolor='#262830', zerolinecolor='#262830',
-               tickfont=dict(color='#8a8d99')),
-    yaxis=dict(gridcolor='#1c1d24', linecolor='#262830', zerolinecolor='#262830',
-               tickfont=dict(color='#8a8d99')),
+    font=dict(family='JetBrains Mono, monospace', color='#8e91a0', size=11),
+    xaxis=dict(gridcolor='#1f2029', linecolor='#2a2c38', zerolinecolor='#2a2c38',
+               tickfont=dict(color='#8e91a0')),
+    yaxis=dict(gridcolor='#1f2029', linecolor='#2a2c38', zerolinecolor='#2a2c38',
+               tickfont=dict(color='#8e91a0')),
     margin=dict(l=10, r=10, t=20, b=10),
     showlegend=False,
 )
 
 ACCENT = '#f5d442'
-DANGER = '#ff7b72'
+CORAL = '#ff6b6b'
+MINT = '#5eead4'
+LILAC = '#a78bfa'
+AMBER = '#fb923c'
 SUBTLE = '#3a3d48'
 
 # =====================================================================
@@ -348,7 +490,7 @@ SUBTLE = '#3a3d48'
 # =====================================================================
 with st.sidebar:
     st.markdown("# Настройки")
-    st.markdown('<div style="color:var(--text-dim);font-size:0.85rem;margin-bottom:1.2rem;">Подкручивайте — таблица пересчитается.</div>', unsafe_allow_html=True)
+    st.markdown('<div style="color:var(--text-dim);font-size:0.85rem;margin-bottom:1.4rem;font-family:Manrope;">Подкручивайте — таблица пересчитается.</div>', unsafe_allow_html=True)
 
     with st.expander("🔻 Хищение", expanded=True):
         cfg_theft_drop = st.slider("Падение, %", 20, 95, 50, 5) / 100
@@ -420,15 +562,14 @@ if not uploaded:
 **Опционально** (без них часть флагов пропускается, но анализ работает):
 - `Разрешенная мощность` — для флага «превышение мощности»
 - `Вид потребителя` (ФИЗ/ЮР) — для «аномалия в когорте»
-- `Заводской номер ПУ`, `Наименование точки учета`, адресные поля — для удобства идентификации
-- `Тип события`, `Дата события` — пока заложено, не используется
+- `Заводской номер ПУ`, `Наименование точки учета`, адресные поля
 
 **Какие флаги считаются:**
-- 🔻 Подозрение на хищение — резкое устойчивое падение vs опорный период
+- 🔻 Подозрение на хищение — резкое устойчивое падение
 - 🔇 Долгое молчание ПУ — длинные пропуски в показаниях
 - ⚡ Превышение мощности — пиковое потребление выше разрешённой
 - 📊 Нестабильность — высокий коэффициент вариации
-- 📐 Одинаковые числа подряд — подозрение на ручной ввод «по нормативу»
+- 📐 Одинаковые подряд — подозрение на ручной ввод «по нормативу»
 - 👥 Аномалия в когорте — потребление сильно выше/ниже соседей
         """)
     st.stop()
@@ -452,28 +593,28 @@ except ValueError as e:
     st.stop()
 
 # =====================================================================
-# ЛЕНТА МЕТРИК (вместо st.metric)
+# ЛЕНТА МЕТРИК
 # =====================================================================
 n_with_flags = int((registry['кол-во_флагов'] > 0).sum())
 n_high_risk = int((registry['кол-во_флагов'] >= 3).sum())
 
 st.markdown(f"""
 <div class="metric-strip">
-  <div class="metric-cell">
+  <div class="metric-cell" style="--cell-accent:var(--lilac);">
     <div class="metric-label">Абонентов в файле</div>
     <div class="metric-value">{report['total_rows']:,}</div>
   </div>
-  <div class="metric-cell">
+  <div class="metric-cell" style="--cell-accent:var(--mint);">
     <div class="metric-label">Месяцев данных</div>
     <div class="metric-value">{report['months_detected']}</div>
   </div>
-  <div class="metric-cell">
+  <div class="metric-cell" style="--cell-accent:var(--accent);">
     <div class="metric-label">С флагами</div>
     <div class="metric-value accent">{n_with_flags:,}</div>
   </div>
-  <div class="metric-cell">
+  <div class="metric-cell" style="--cell-accent:var(--coral);">
     <div class="metric-label">Высокий риск (3+ флага)</div>
-    <div class="metric-value accent">{n_high_risk:,}</div>
+    <div class="metric-value coral">{n_high_risk:,}</div>
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -499,7 +640,7 @@ with st.expander(f"Период: {report['period_range']} · что распоз
                 )
         else:
             st.markdown('<div class="section-label">Все флаги вычислены</div>', unsafe_allow_html=True)
-            st.markdown('<div style="color:var(--good);">✓ полный набор</div>', unsafe_allow_html=True)
+            st.markdown('<div style="color:var(--mint);font-family:JetBrains Mono;">✓ полный набор</div>', unsafe_allow_html=True)
 
 # =====================================================================
 # ВКЛАДКИ
@@ -514,12 +655,15 @@ with tab_summary:
         st.markdown('<div class="section-label">Распределение</div>', unsafe_allow_html=True)
         st.markdown('<div class="section-title">По числу флагов</div>', unsafe_allow_html=True)
         flag_counts = registry['кол-во_флагов'].value_counts().sort_index()
-        colors = [SUBTLE if k == 0 else ACCENT for k in flag_counts.index]
+        # градиент: 0 — серый, 1 — мята, 2 — жёлтый, 3+ — коралл
+        scale = {0: SUBTLE, 1: MINT, 2: ACCENT, 3: AMBER, 4: CORAL, 5: CORAL}
+        colors = [scale.get(int(k), CORAL) for k in flag_counts.index]
         fig = go.Figure(go.Bar(
             x=flag_counts.index.astype(int).astype(str), y=flag_counts.values,
             text=flag_counts.values, textposition='outside',
-            marker_color=colors,
-            textfont=dict(family='JetBrains Mono', color='#e8e9ed', size=12),
+            marker=dict(color=colors, line=dict(color=colors, width=0)),
+            textfont=dict(family='JetBrains Mono', color='#ececf0', size=12),
+            hovertemplate='<b>%{x} флагов</b><br>%{y} абонентов<extra></extra>',
         ))
         fig.update_layout(**PLOTLY_LAYOUT, height=320,
                           xaxis_title=None, yaxis_title=None)
@@ -529,13 +673,19 @@ with tab_summary:
         st.markdown('<div class="section-label">Срабатывание</div>', unsafe_allow_html=True)
         st.markdown('<div class="section-title">Каждого флага</div>', unsafe_allow_html=True)
         flag_names = [f['name'] for f in FLAG_DEFINITIONS if f['name'] in flags.columns]
-        flag_sums = sorted([(FLAG_TITLES.get(n, n), int(flags[n].sum())) for n in flag_names],
-                           key=lambda x: x[1])
+        flag_data = sorted(
+            [(FLAG_TITLES.get(n, n), int(flags[n].sum()), FLAG_COLOR.get(n, CORAL)) for n in flag_names],
+            key=lambda x: x[1]
+        )
         fig2 = go.Figure(go.Bar(
-            y=[n for n, _ in flag_sums], x=[v for _, v in flag_sums],
-            text=[v for _, v in flag_sums], textposition='outside',
-            orientation='h', marker_color=DANGER,
-            textfont=dict(family='JetBrains Mono', color='#e8e9ed', size=12),
+            y=[t for t, _, _ in flag_data],
+            x=[v for _, v, _ in flag_data],
+            text=[v for _, v, _ in flag_data],
+            textposition='outside',
+            orientation='h',
+            marker=dict(color=[c for _, _, c in flag_data]),
+            textfont=dict(family='JetBrains Mono', color='#ececf0', size=12),
+            hovertemplate='<b>%{y}</b><br>%{x} абонентов<extra></extra>',
         ))
         fig2.update_layout(**PLOTLY_LAYOUT, height=320,
                            xaxis_title=None, yaxis_title=None)
@@ -544,12 +694,13 @@ with tab_summary:
     st.markdown('<div class="section-label">Сезонная классификация</div>', unsafe_allow_html=True)
     st.markdown('<div class="section-title">По характеру потребления</div>', unsafe_allow_html=True)
     seas = registry['сезонность'].value_counts()
-    season_color = {'круглогодичный': '#6dcf91', 'летний (дача)': '#f5d442',
-                    'зимний (отопление)': '#ff7b72', 'нет данных': SUBTLE}
+    season_color = {'круглогодичный': MINT, 'летний (дача)': ACCENT,
+                    'зимний (отопление)': CORAL, 'нет данных': SUBTLE}
     fig3 = go.Figure(go.Bar(
         x=seas.index, y=seas.values, text=seas.values, textposition='outside',
         marker_color=[season_color.get(k, SUBTLE) for k in seas.index],
-        textfont=dict(family='JetBrains Mono', color='#e8e9ed', size=12),
+        textfont=dict(family='JetBrains Mono', color='#ececf0', size=12),
+        hovertemplate='<b>%{x}</b><br>%{y} абонентов<extra></extra>',
     ))
     fig3.update_layout(**PLOTLY_LAYOUT, height=280,
                        xaxis_title=None, yaxis_title=None)
@@ -579,7 +730,6 @@ with tab_registry:
     for fn in active_flag_filter:
         view = view[view[fn] == True]
 
-    # переименовать колонки на русский для отображения
     display_view = view.rename(columns={
         **METRIC_LABELS,
         **{k: f"{FLAG_EMOJI.get(k,'')} {FLAG_TITLES.get(k,k)}" for k in flags.columns},
@@ -587,7 +737,7 @@ with tab_registry:
 
     st.markdown(
         f'<div style="font-family:JetBrains Mono,monospace;font-size:0.78rem;'
-        f'color:var(--text-dim);text-transform:uppercase;letter-spacing:0.12em;'
+        f'color:var(--text-dim);text-transform:uppercase;letter-spacing:0.14em;'
         f'margin:0.5rem 0 0.8rem 0;">'
         f'Показано <span style="color:var(--accent);">{len(view):,}</span> из {len(registry):,} абонентов'
         f'</div>',
@@ -635,11 +785,14 @@ with tab_detail:
         fig.add_trace(go.Scatter(
             x=[p.to_timestamp() for p in periods], y=s.values,
             mode='lines+markers',
-            line=dict(color=ACCENT, width=1.4),
-            marker=dict(size=4, color=ACCENT),
+            line=dict(color=ACCENT, width=1.6),
+            marker=dict(size=5, color=ACCENT, line=dict(color='#0a0b0f', width=1)),
             connectgaps=False,
+            fill='tozeroy',
+            fillcolor='rgba(245, 212, 66, 0.08)',
+            hovertemplate='<b>%{x|%b %Y}</b><br>%{y:,.0f} кВт·ч<extra></extra>',
         ))
-        fig.update_layout(**PLOTLY_LAYOUT, height=380,
+        fig.update_layout(**PLOTLY_LAYOUT, height=400,
                           xaxis_title=None, yaxis_title='кВт·ч')
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
@@ -651,14 +804,15 @@ with tab_detail:
             if row_flags:
                 html = ""
                 for n in row_flags:
-                    html += (f'<div class="flag-row">'
+                    color = FLAG_COLOR.get(n, ACCENT)
+                    html += (f'<div class="flag-row" style="--flag-color:{color};">'
                              f'<span class="emoji">{FLAG_EMOJI.get(n,"🚩")}</span>'
                              f'<span class="name">{FLAG_TITLES.get(n,n)}</span></div>')
                 st.markdown(html, unsafe_allow_html=True)
             else:
                 st.markdown('<div class="flag-empty">✓ Без флагов</div>', unsafe_allow_html=True)
 
-            st.markdown('<div class="section-label" style="margin-top:1.5rem;">Ключевые метрики</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-label" style="margin-top:1.6rem;">Ключевые метрики</div>', unsafe_allow_html=True)
             metric_keys = ['active_months', 'mean_kwh', 'avg_recent', 'avg_baseline',
                            'drop_ratio', 'longest_silence', 'longest_flat_run',
                            'power_ratio', 'cohort_z', 'сезонность']
@@ -698,10 +852,7 @@ with tab_detail:
 # ПОДВАЛ
 # =====================================================================
 st.markdown("""
-<div style="margin-top:3rem;padding:1rem 0;border-top:1px solid var(--border);
-            font-family:'JetBrains Mono',monospace;font-size:0.7rem;
-            color:var(--text-faint);text-transform:uppercase;letter-spacing:0.18em;
-            text-align:center;">
+<div class="footer-strip">
   Прототип · Данные не сохраняются · Работает в браузере
 </div>
 """, unsafe_allow_html=True)
