@@ -42,12 +42,12 @@ METRIC_LABELS = {
 }
 
 FLAG_EMOJI = {
-    'подозрение_хищение':   '🔻',
-    'долгое_молчание':      '🔇',
-    'превышение_мощности':  '⚡',
-    'нестабильность':       '📊',
-    'одинаковые_подряд':    '📐',
-    'аномалия_в_когорте':   '👥',
+    'подозрение_хищение':   '▼',   # треугольник вниз — падение
+    'долгое_молчание':      '◌',   # пунктирный круг — нет данных
+    'превышение_мощности':  '▲',   # треугольник вверх — превышение
+    'нестабильность':       '~',   # волна — нестабильно
+    'одинаковые_подряд':    '▦',   # сетка — повторение
+    'аномалия_в_когорте':   '◆',   # ромб — выбивается
 }
 
 FLAG_TITLES = {
@@ -73,6 +73,9 @@ FLAG_COLOR = {
 # =====================================================================
 CSS = """
 <style>
+/* Material Symbols — дублирующая загрузка с jsdelivr на случай блокировки Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined');
+@import url('https://cdn.jsdelivr.net/npm/material-icons@1.13.12/iconfont/material-icons.css');
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600;700;800;900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
@@ -164,22 +167,22 @@ h2 { font-size: 1.6rem !important; }
     letter-spacing: 0.005em;
     line-height: 0.96;
     margin: 0;
-    color: #FFFFFF;
+    color: #FFFFFF !important;
     text-transform: uppercase;
     position: relative;
     z-index: 2;
 }
-.hero-title em {
+.hero-title em, .hero-title span.hero-em {
     font-style: normal;
     font-weight: 300;
-    color: var(--sky);
-    border-bottom: 4px solid var(--red);
+    color: #B8D4ED !important;
+    border-bottom: 4px solid #C8102E;
     padding-bottom: 2px;
 }
 .hero-meta {
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.72rem;
-    color: rgba(255, 255, 255, 0.75);
+    color: rgba(255, 255, 255, 0.78) !important;
     text-transform: uppercase;
     letter-spacing: 0.18em;
     text-align: right;
@@ -189,7 +192,14 @@ h2 { font-size: 1.6rem !important; }
     z-index: 2;
     padding-right: 90px;
 }
-.hero-meta b { color: #FFFFFF; font-weight: 600; }
+.hero-meta .badge {
+    display: inline-block;
+    color: #FFFFFF !important;
+    font-weight: 600;
+    border-left: 3px solid #C8102E;
+    padding-left: 8px;
+    margin-bottom: 4px;
+}
 
 /* ========= ЛЕНТА МЕТРИК ========= */
 .metric-strip {
@@ -405,16 +415,34 @@ h2 { font-size: 1.6rem !important; }
     background: var(--bg-soft) !important;
     border: 2px dashed var(--blue-light) !important;
     border-radius: 2px !important;
+    padding: 1.2rem 1.5rem !important;
+    min-height: 90px !important;
     transition: border-color 0.2s, background 0.2s;
 }
 [data-testid="stFileUploaderDropzone"]:hover {
     border-color: var(--navy) !important;
     background: #FFFFFF !important;
 }
+/* Кнопка "Browse files" — без uppercase и без condensed-шрифта,
+   чтобы текст помещался даже при долгих переводах */
 [data-testid="stFileUploaderDropzone"] button {
     background: var(--navy) !important;
     color: #FFFFFF !important;
     border: none !important;
+    font-family: 'Manrope', sans-serif !important;
+    font-weight: 500 !important;
+    font-size: 0.9rem !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    padding: 0.55rem 1.2rem !important;
+    min-width: 130px;
+    white-space: nowrap !important;
+}
+/* Спрятать иконку material-icons если она не загрузилась
+   (на корп. сетях Google Fonts иногда блокируется) */
+[data-testid="stFileUploaderDropzone"] [class*="material-icons"]:empty,
+[data-testid="stFileUploaderDropzone"] svg:not([role]) {
+    display: none !important;
 }
 
 /* dataframe */
@@ -521,28 +549,28 @@ with st.sidebar:
     st.markdown("# Настройки")
     st.markdown('<div style="color:var(--text-dim);font-size:0.86rem;margin-bottom:1.2rem;">Подкручивайте — таблица пересчитается.</div>', unsafe_allow_html=True)
 
-    with st.expander("🔻 Хищение", expanded=True):
+    with st.expander("Хищение", expanded=True):
         cfg_theft_drop = st.slider("Падение, %", 20, 95, 50, 5) / 100
         cfg_theft_recent = st.slider("Недавний период, мес.", 3, 24, 12)
         cfg_theft_baseline = st.slider("Опорный период, мес.", 6, 36, 24)
         cfg_theft_min = st.number_input("Мин. опорное, кВт·ч", 0, 10000, 50, 10)
 
-    with st.expander("🔇 Молчание ПУ"):
+    with st.expander("Молчание ПУ"):
         cfg_silence = st.slider("Подряд месяцев без показаний", 3, 24, 6)
 
-    with st.expander("⚡ Превышение мощности"):
+    with st.expander("Превышение мощности"):
         cfg_power_ratio = st.slider("Порог пиковой/разрешённой", 0.5, 3.0, 1.0, 0.1)
 
-    with st.expander("📊 Нестабильность"):
+    with st.expander("Нестабильность"):
         cfg_cv = st.slider("Коэфф. вариации", 0.3, 3.0, 1.2, 0.1)
 
-    with st.expander("📐 Одинаковые подряд"):
+    with st.expander("Одинаковые подряд"):
         cfg_flat = st.slider("Подряд одинаковых значений", 3, 24, 6)
 
-    with st.expander("👥 Аномалия в когорте"):
+    with st.expander("Аномалия в когорте"):
         cfg_z = st.slider("Robust z-score порог", 1.5, 5.0, 3.0, 0.1)
 
-    with st.expander("🔧 Прочее"):
+    with st.expander("Прочее"):
         cfg_min_active = st.slider("Мин. активных месяцев", 3, 36, 12)
 
 config = {
@@ -558,9 +586,9 @@ config = {
 # =====================================================================
 st.markdown("""
 <div class="hero">
-  <h1 class="hero-title">АНАЛИЗ <em>АНОМАЛЬНОГО</em><br/>ПОТРЕБЛЕНИЯ</h1>
+  <h1 class="hero-title">Анализ <span class="hero-em">аномального</span><br/>потребления</h1>
   <div class="hero-meta">
-    <b>⚡ ЭНЕРГОУЧЁТ</b><br/>
+    <span class="badge">ЭНЕРГОУЧЁТ</span><br/>
     Реестр абонентов с флагами<br/>
     Данные не сохраняются
   </div>
@@ -594,12 +622,12 @@ if not uploaded:
 - `Заводской номер ПУ`, `Наименование точки учета`, адресные поля
 
 **Какие флаги считаются:**
-- 🔻 Подозрение на хищение — резкое устойчивое падение
-- 🔇 Долгое молчание ПУ — длинные пропуски в показаниях
-- ⚡ Превышение мощности — пиковое потребление выше разрешённой
-- 📊 Нестабильность — высокий коэффициент вариации
-- 📐 Одинаковые подряд — подозрение на ручной ввод «по нормативу»
-- 👥 Аномалия в когорте — потребление сильно выше/ниже соседей
+- ▼ Подозрение на хищение — резкое устойчивое падение
+- ◌ Долгое молчание ПУ — длинные пропуски в показаниях
+- ▲ Превышение мощности — пиковое потребление выше разрешённой
+- ~ Нестабильность — высокий коэффициент вариации
+- ▦ Одинаковые подряд — подозрение на ручной ввод «по нормативу»
+- ◆ Аномалия в когорте — потребление сильно выше/ниже соседей
         """)
     st.stop()
 
@@ -788,7 +816,7 @@ with tab_registry:
     dl1, dl2 = st.columns(2)
     with dl1:
         st.download_button(
-            "📊 Сводный отчёт (Excel)",
+            "Сводный отчёт (Excel)",
             data=full_report_bytes,
             file_name=f"анализ_потребления_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -797,7 +825,7 @@ with tab_registry:
         )
     with dl2:
         st.download_button(
-            "📋 Только текущая выборка",
+            "Только текущая выборка",
             data=excel_buf.getvalue(),
             file_name=f"выборка_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -906,7 +934,7 @@ with tab_detail:
             detect_month_columns(df_raw),
         )
         st.download_button(
-            "📄 Карточка абонента (Excel)",
+            "Карточка абонента (Excel)",
             data=card_bytes,
             file_name=f"абонент_{selected}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
