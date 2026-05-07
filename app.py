@@ -1,7 +1,6 @@
 """
 Streamlit-приложение: анализ аномального потребления.
-Эстетика: editorial dark, диспетчерская энергосистемы, расширенная палитра.
-CSS жёстко перекрывает дефолты — config.toml желателен, но не обязателен.
+Стиль: корпоративный (по образцу Россети Кубань) — светлый фон, navy и красный акценты.
 """
 import streamlit as st
 import pandas as pd
@@ -13,6 +12,7 @@ from analyzer import (
     analyze, DEFAULT_CONFIG, FLAG_DEFINITIONS,
     detect_month_columns, MONTHS_RU
 )
+from excel_export import build_full_report, build_subscriber_card
 
 st.set_page_config(
     page_title="Анализ потребления",
@@ -22,7 +22,7 @@ st.set_page_config(
 )
 
 # =====================================================================
-# СЛОВАРИ ЛОКАЛИЗАЦИИ
+# ЛОКАЛИЗАЦИЯ
 # =====================================================================
 METRIC_LABELS = {
     'active_months':    'Активных месяцев',
@@ -59,219 +59,234 @@ FLAG_TITLES = {
     'аномалия_в_когорте':   'Аномалия в когорте',
 }
 
-# Цвет на флаг — расширенная палитра
 FLAG_COLOR = {
-    'подозрение_хищение':   '#ff6b6b',  # коралл
-    'долгое_молчание':      '#a78bfa',  # лиловый
-    'превышение_мощности':  '#f5d442',  # электр. жёлтый
-    'нестабильность':       '#5eead4',  # бирюза
-    'одинаковые_подряд':    '#fb923c',  # янтарь
-    'аномалия_в_когорте':   '#f472b6',  # розовый
+    'подозрение_хищение':   '#C8102E',  # красный (Россети)
+    'долгое_молчание':      '#5A6F8E',  # серо-синий
+    'превышение_мощности':  '#E37222',  # оранжевый
+    'нестабильность':       '#0E8A6E',  # бирюзово-зелёный
+    'одинаковые_подряд':    '#7B5BA6',  # фиолетовый
+    'аномалия_в_когорте':   '#1F3868',  # navy
 }
 
 # =====================================================================
-# СТИЛИ — жёстко перекрывают дефолты Streamlit
+# СТИЛИ
 # =====================================================================
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800;9..144,900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600;700;800;900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-    --bg: #0a0b0f;
-    --bg-glow: #14151d;
-    --surface: #14151c;
-    --surface-2: #1c1d26;
-    --border: #2a2c38;
-    --border-soft: #1f2029;
-    --text: #ececf0;
-    --text-dim: #8e91a0;
-    --text-faint: #5a5d6a;
+    --navy:        #1F3868;       /* основной корпоративный (фон обложек Россети) */
+    --navy-deep:   #142647;       /* темнее navy */
+    --blue:        #2E5BA8;       /* акцентный синий */
+    --blue-light:  #5891CA;       /* светло-синий */
+    --sky:         #B8D4ED;       /* небесный для фонов */
+    --red:         #C8102E;       /* красный (флаг "опасно") */
+    --orange:      #E37222;       /* оранжевый */
+    --green:       #0E8A6E;       /* зелёный (позитивные показатели) */
+    --purple:      #7B5BA6;
+    --gold:        #C9A227;
 
-    --accent: #f5d442;          /* электрический жёлтый */
-    --accent-glow: #fde047;
-    --coral: #ff6b6b;           /* для опасности */
-    --mint: #5eead4;            /* для нормы */
-    --lilac: #a78bfa;           /* для нейтрального */
-    --amber: #fb923c;           /* для предупреждения */
-    --rose: #f472b6;            /* для редкого */
+    --bg:          #FFFFFF;
+    --bg-soft:     #F4F6FA;       /* очень светлый фон карточек */
+    --bg-card:     #FFFFFF;
+    --border:      #E1E5EB;
+    --border-soft: #EEF1F5;
+    --text:        #1A1F2C;
+    --text-dim:    #5A6478;
+    --text-faint:  #98A0AE;
 }
 
-/* фон с лёгким свечением сверху */
-.stApp {
-    background:
-        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(245, 212, 66, 0.08), transparent 70%),
-        radial-gradient(ellipse 60% 40% at 100% 0%, rgba(167, 139, 250, 0.06), transparent 60%),
-        var(--bg) !important;
-}
+/* фон */
+.stApp { background: var(--bg) !important; }
 
 html, body, [class*="css"], .stApp, .stApp * {
     font-family: 'Manrope', system-ui, sans-serif;
     color: var(--text);
 }
 
-/* шапка / тулбар */
-header[data-testid="stHeader"] { background: transparent !important; }
-.stDeployButton, #MainMenu, footer { display: none !important; visibility: hidden !important; }
+/* убираем дефолтные элементы */
+header[data-testid="stHeader"] { background: transparent !important; height: 0; }
+.stDeployButton, #MainMenu, footer { display: none !important; }
+.block-container { padding-top: 1.5rem !important; }
 
 /* типографика */
 h1, h2, h3, .display-font {
-    font-family: 'Fraunces', Georgia, serif !important;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    color: var(--text);
+    font-family: 'Barlow Condensed', sans-serif !important;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    color: var(--navy);
+    text-transform: uppercase;
 }
-h1 { font-size: 3.2rem !important; line-height: 1; }
+h1 { font-size: 3rem !important; line-height: 1; letter-spacing: 0.01em; }
 h2 { font-size: 1.6rem !important; }
-h3 { font-size: 1.2rem !important; }
 
 .mono { font-family: 'JetBrains Mono', monospace !important; }
 
-/* ============ HERO ============ */
+/* ========= HERO (как обложка слайда Россети: navy блок) ========= */
 .hero {
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    padding: 1.6rem 0;
-    margin: 0.5rem 0 2rem 0;
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-deep) 100%);
+    color: #FFFFFF;
+    padding: 2rem 2.4rem;
+    margin: 0 -1rem 2rem -1rem;
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
     gap: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+/* красный треугольник в стиле обложки Россети */
+.hero::before {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 0; height: 0;
+    border-style: solid;
+    border-width: 0 110px 110px 0;
+    border-color: transparent var(--red) transparent transparent;
+    opacity: 0.92;
+}
+.hero::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 110px;
+    width: 0; height: 0;
+    border-style: solid;
+    border-width: 0 80px 80px 0;
+    border-color: transparent var(--blue-light) transparent transparent;
+    opacity: 0.7;
 }
 .hero-title {
-    font-family: 'Fraunces', serif !important;
+    font-family: 'Barlow Condensed', sans-serif !important;
     font-weight: 800;
-    font-size: 3rem;
-    letter-spacing: -0.035em;
-    line-height: 0.95;
+    font-size: 3.4rem;
+    letter-spacing: 0.005em;
+    line-height: 0.96;
     margin: 0;
-    color: var(--text);
+    color: #FFFFFF;
+    text-transform: uppercase;
+    position: relative;
+    z-index: 2;
 }
 .hero-title em {
-    font-style: italic;
+    font-style: normal;
     font-weight: 300;
-    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-glow) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--sky);
+    border-bottom: 4px solid var(--red);
+    padding-bottom: 2px;
 }
 .hero-meta {
     font-family: 'JetBrains Mono', monospace !important;
-    font-size: 0.7rem;
-    color: var(--text-dim);
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.75);
     text-transform: uppercase;
     letter-spacing: 0.18em;
     text-align: right;
     line-height: 1.7;
     white-space: nowrap;
+    position: relative;
+    z-index: 2;
+    padding-right: 90px;
 }
-.hero-meta b { color: var(--accent); font-weight: 500; }
+.hero-meta b { color: #FFFFFF; font-weight: 600; }
 
-/* ============ ЛЕНТА МЕТРИК ============ */
+/* ========= ЛЕНТА МЕТРИК ========= */
 .metric-strip {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 0;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+    gap: 1rem;
     margin-bottom: 2rem;
-    overflow: hidden;
 }
 .metric-cell {
-    padding: 1.4rem 1.6rem;
-    border-right: 1px solid var(--border);
-    position: relative;
+    padding: 1.4rem 1.5rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--cell-accent, var(--navy));
+    border-radius: 2px;
+    transition: box-shadow 0.2s;
 }
-.metric-cell:last-child { border-right: none; }
-.metric-cell::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: var(--cell-accent, transparent);
-}
+.metric-cell:hover { box-shadow: 0 4px 12px rgba(31, 56, 104, 0.08); }
 .metric-label {
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.66rem;
     text-transform: uppercase;
     letter-spacing: 0.2em;
     color: var(--text-dim);
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.7rem;
+    font-weight: 500;
 }
 .metric-value {
-    font-family: 'Fraunces', serif !important;
-    font-weight: 600;
-    font-size: 2.6rem;
+    font-family: 'Barlow Condensed', sans-serif !important;
+    font-weight: 700;
+    font-size: 3rem;
     line-height: 1;
-    color: var(--text);
+    color: var(--navy);
 }
-.metric-value.accent { color: var(--accent); }
-.metric-value.coral  { color: var(--coral); }
-.metric-value.mint   { color: var(--mint); }
+.metric-value.red { color: var(--red); }
+.metric-value.green { color: var(--green); }
+.metric-value.blue { color: var(--blue); }
 
-/* ============ СЕКЦИОННЫЕ ЗАГОЛОВКИ ============ */
+/* ========= СЕКЦИОННЫЕ ЗАГОЛОВКИ ========= */
 .section-label {
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.7rem;
     text-transform: uppercase;
-    letter-spacing: 0.25em;
-    color: var(--accent);
+    letter-spacing: 0.22em;
+    color: var(--blue);
     margin: 2rem 0 0.4rem 0;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-}
-.section-label::before {
-    content: '';
-    display: inline-block;
-    width: 6px; height: 6px;
-    background: var(--accent);
-    border-radius: 50%;
-    box-shadow: 0 0 8px var(--accent);
+    font-weight: 500;
 }
 .section-title {
-    font-family: 'Fraunces', serif !important;
+    font-family: 'Barlow Condensed', sans-serif !important;
     font-weight: 600;
-    font-size: 1.6rem;
-    line-height: 1.1;
-    margin: 0.3rem 0 1.3rem 0;
-    color: var(--text);
+    font-size: 1.7rem;
+    line-height: 1.05;
+    text-transform: uppercase;
+    color: var(--navy);
+    margin: 0.2rem 0 1.3rem 0;
+    padding-bottom: 0.7rem;
+    border-bottom: 2px solid var(--navy);
 }
 
-/* ============ ФЛАГИ ============ */
+/* ========= ФЛАГИ ========= */
 .flag-row {
     display: flex;
     align-items: center;
     gap: 0.8rem;
     padding: 0.7rem 1rem;
     margin-bottom: 0.5rem;
-    background: linear-gradient(90deg, var(--flag-color, var(--accent))15 0%, var(--surface) 30%);
-    border-left: 3px solid var(--flag-color, var(--accent));
-    border-radius: 2px;
-    transition: transform 0.15s ease;
+    background: var(--bg-soft);
+    border-left: 4px solid var(--flag-color, var(--navy));
+    transition: transform 0.15s ease, box-shadow 0.15s;
 }
-.flag-row:hover { transform: translateX(4px); }
-.flag-row .emoji { font-size: 1.1rem; }
-.flag-row .name { font-weight: 500; color: var(--text); font-size: 0.95rem; }
+.flag-row:hover {
+    transform: translateX(3px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+.flag-row .emoji { font-size: 1.05rem; }
+.flag-row .name {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 500;
+    color: var(--text);
+    font-size: 0.95rem;
+}
 .flag-empty {
     padding: 0.9rem 1.1rem;
-    color: var(--mint);
-    background: linear-gradient(90deg, rgba(94, 234, 212, 0.1), rgba(94, 234, 212, 0.02));
-    border-left: 3px solid var(--mint);
-    border-radius: 2px;
+    color: var(--green);
+    background: rgba(14, 138, 110, 0.08);
+    border-left: 4px solid var(--green);
     font-weight: 500;
 }
 
-/* ============ KEY-VALUE СПИСОК ============ */
+/* ========= KEY-VALUE ========= */
 .kv-list { font-family: 'Manrope', sans-serif; }
 .kv-row {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
     padding: 0.55rem 0;
-    border-bottom: 1px dashed var(--border-soft);
+    border-bottom: 1px dashed var(--border);
     gap: 1rem;
 }
 .kv-row:last-child { border-bottom: none; }
@@ -281,80 +296,75 @@ h3 { font-size: 1.2rem !important; }
     font-size: 0.92rem;
     color: var(--text);
     text-align: right;
+    font-weight: 500;
     word-break: break-word;
 }
 
-/* ============ ТАБЫ ============ */
+/* ========= ТАБЫ ========= */
 .stTabs [data-baseweb="tab-list"] {
     gap: 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 2px solid var(--border);
     background: transparent;
 }
 .stTabs [data-baseweb="tab"] {
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 0.78rem !important;
+    font-family: 'Barlow Condensed', sans-serif !important;
+    font-size: 1.05rem !important;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.18em;
-    padding: 0.85rem 1.4rem;
+    letter-spacing: 0.06em;
+    padding: 0.7rem 1.6rem;
     color: var(--text-dim);
     background: transparent;
     border: none;
-    border-bottom: 2px solid transparent;
-    transition: color 0.2s;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.2s, border-color 0.2s;
 }
-.stTabs [data-baseweb="tab"]:hover { color: var(--text); }
+.stTabs [data-baseweb="tab"]:hover { color: var(--navy); }
 .stTabs [aria-selected="true"] {
-    color: var(--accent) !important;
-    border-bottom-color: var(--accent) !important;
-    background: linear-gradient(180deg, transparent 50%, rgba(245, 212, 66, 0.05));
+    color: var(--navy) !important;
+    border-bottom-color: var(--red) !important;
 }
 
-/* ============ САЙДБАР ============ */
+/* ========= САЙДБАР ========= */
 [data-testid="stSidebar"] {
-    background: var(--surface) !important;
+    background: var(--bg-soft) !important;
     border-right: 1px solid var(--border);
 }
 [data-testid="stSidebar"] h1 {
-    font-family: 'Fraunces', serif !important;
-    font-size: 1.6rem !important;
-    margin-bottom: 0.5rem;
-    color: var(--text);
+    font-family: 'Barlow Condensed', sans-serif !important;
+    font-size: 1.8rem !important;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 0.4rem;
+    text-transform: uppercase;
 }
 [data-testid="stSidebar"] [data-testid="stExpander"] {
-    background: transparent;
+    background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 3px;
+    border-radius: 2px;
     margin-bottom: 0.5rem;
 }
 [data-testid="stSidebar"] [data-testid="stExpander"] summary {
     font-family: 'Manrope', sans-serif !important;
-    font-weight: 500;
-    color: var(--text);
+    font-weight: 600;
+    color: var(--navy);
 }
 
-/* ============ СЛАЙДЕРЫ — ЖЁЛТЫЕ ============ */
-/* активная часть трека */
+/* ========= СЛАЙДЕРЫ — синий navy ========= */
 .stSlider [data-baseweb="slider"] > div > div > div {
-    background: var(--accent) !important;
+    background: var(--navy) !important;
 }
-/* ползунок */
 .stSlider [role="slider"] {
-    background-color: var(--accent) !important;
-    border-color: var(--accent) !important;
-    box-shadow: 0 0 0 4px rgba(245, 212, 66, 0.15) !important;
+    background-color: var(--navy) !important;
+    border-color: var(--navy) !important;
+    box-shadow: 0 0 0 4px rgba(31, 56, 104, 0.15) !important;
 }
-/* подпись со значением (всплывает над ползунком) */
 .stSlider [data-baseweb="tooltip"] > div {
-    background: var(--accent) !important;
-    color: var(--bg) !important;
+    background: var(--navy) !important;
+    color: #FFFFFF !important;
     font-family: 'JetBrains Mono', monospace !important;
-    font-weight: 500;
-}
-/* числовое значение под ползунком */
-.stSlider [data-testid="stTickBarMin"],
-.stSlider [data-testid="stTickBarMax"] {
-    color: var(--text-faint) !important;
-    font-family: 'JetBrains Mono', monospace !important;
+    font-weight: 600;
 }
 
 /* number input */
@@ -364,62 +374,62 @@ h3 { font-size: 1.2rem !important; }
     border: 1px solid var(--border) !important;
     font-family: 'JetBrains Mono', monospace !important;
 }
-.stNumberInput button {
-    background: var(--surface-2) !important;
-    color: var(--text) !important;
-    border-color: var(--border) !important;
-}
 
 /* select */
 .stSelectbox > div > div, .stMultiSelect > div > div {
-    background: var(--surface) !important;
+    background: var(--bg) !important;
     border: 1px solid var(--border) !important;
 }
 
-/* ============ КНОПКИ ============ */
+/* ========= КНОПКИ ========= */
 .stDownloadButton button, .stButton button {
-    background: var(--accent) !important;
-    color: var(--bg) !important;
+    background: var(--navy) !important;
+    color: #FFFFFF !important;
     border: none !important;
-    font-family: 'JetBrains Mono', monospace !important;
+    font-family: 'Barlow Condensed', sans-serif !important;
     font-weight: 600 !important;
-    font-size: 0.78rem !important;
+    font-size: 1rem !important;
     text-transform: uppercase;
-    letter-spacing: 0.16em;
-    padding: 0.7rem 1.6rem !important;
-    border-radius: 3px !important;
-    transition: transform 0.1s, box-shadow 0.2s;
+    letter-spacing: 0.08em;
+    padding: 0.7rem 1.8rem !important;
+    border-radius: 2px !important;
+    transition: background 0.15s, transform 0.1s;
 }
 .stDownloadButton button:hover, .stButton button:hover {
-    background: var(--accent-glow) !important;
-    box-shadow: 0 0 24px rgba(245, 212, 66, 0.3);
+    background: var(--red) !important;
     transform: translateY(-1px);
 }
 
-/* file uploader */
+/* ========= FILE UPLOADER ========= */
 [data-testid="stFileUploaderDropzone"] {
-    background: var(--surface) !important;
-    border: 1px dashed var(--border) !important;
-    border-radius: 4px !important;
+    background: var(--bg-soft) !important;
+    border: 2px dashed var(--blue-light) !important;
+    border-radius: 2px !important;
     transition: border-color 0.2s, background 0.2s;
 }
 [data-testid="stFileUploaderDropzone"]:hover {
-    border-color: var(--accent) !important;
-    background: var(--surface-2) !important;
+    border-color: var(--navy) !important;
+    background: #FFFFFF !important;
 }
 [data-testid="stFileUploaderDropzone"] button {
-    background: var(--accent) !important;
-    color: var(--bg) !important;
+    background: var(--navy) !important;
+    color: #FFFFFF !important;
+    border: none !important;
 }
 
 /* dataframe */
 [data-testid="stDataFrame"] {
     border: 1px solid var(--border);
-    border-radius: 3px;
-    overflow: hidden;
+    border-radius: 2px;
 }
 
-/* ============ PILLS ============ */
+/* expander */
+[data-testid="stExpander"] {
+    border: 1px solid var(--border);
+    border-radius: 2px;
+}
+
+/* pills */
 .pill {
     display: inline-block;
     padding: 0.22rem 0.7rem;
@@ -428,69 +438,88 @@ h3 { font-size: 1.2rem !important; }
     font-size: 0.74rem;
     margin: 0.18rem 0.22rem 0.18rem 0;
     border: 1px solid var(--border);
-    background: var(--surface);
+    background: var(--bg-soft);
+    color: var(--text);
 }
-.pill.found { color: var(--mint); border-color: rgba(94, 234, 212, 0.3); }
-.pill.miss  { color: var(--text-dim); }
+.pill.found {
+    color: var(--green);
+    border-color: rgba(14, 138, 110, 0.3);
+    background: rgba(14, 138, 110, 0.05);
+}
 
-/* ============ ЗАГЛУШКА ============ */
+/* заглушка */
 .empty-state {
     border: 1px dashed var(--border);
     padding: 3rem 2rem;
     text-align: center;
     color: var(--text-dim);
-    font-family: 'Fraunces', serif !important;
-    font-style: italic;
-    font-size: 1.2rem;
+    font-family: 'Barlow Condensed', sans-serif !important;
+    font-size: 1.6rem;
     margin: 1rem 0;
-    background: linear-gradient(180deg, var(--surface) 0%, transparent 100%);
-    border-radius: 4px;
+    background: var(--bg-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    font-weight: 400;
+}
+.empty-state .small {
+    text-transform: none;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.8rem;
+    color: var(--text-faint);
+    letter-spacing: 0.05em;
+    display: block;
+    margin-top: 0.7rem;
+    font-weight: 400;
 }
 
-/* ============ ПОДВАЛ ============ */
+/* подвал */
 .footer-strip {
     margin-top: 3rem;
     padding: 1.2rem 0;
-    border-top: 1px solid var(--border);
+    border-top: 2px solid var(--navy);
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.7rem;
-    color: var(--text-faint);
+    color: var(--text-dim);
     text-transform: uppercase;
     letter-spacing: 0.2em;
     text-align: center;
 }
+
+/* Streamlit info/warning/error */
+.stAlert { border-radius: 2px !important; }
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
 
 # =====================================================================
-# Plotly-тема
+# Plotly-тема (светлая, корпоративная)
 # =====================================================================
 PLOTLY_LAYOUT = dict(
     paper_bgcolor='rgba(0,0,0,0)',
-    plot_bgcolor='rgba(0,0,0,0)',
-    font=dict(family='JetBrains Mono, monospace', color='#8e91a0', size=11),
-    xaxis=dict(gridcolor='#1f2029', linecolor='#2a2c38', zerolinecolor='#2a2c38',
-               tickfont=dict(color='#8e91a0')),
-    yaxis=dict(gridcolor='#1f2029', linecolor='#2a2c38', zerolinecolor='#2a2c38',
-               tickfont=dict(color='#8e91a0')),
+    plot_bgcolor='rgba(244, 246, 250, 0.4)',
+    font=dict(family='Manrope, sans-serif', color='#5A6478', size=11),
+    xaxis=dict(gridcolor='#EEF1F5', linecolor='#E1E5EB', zerolinecolor='#E1E5EB',
+               tickfont=dict(color='#5A6478', family='JetBrains Mono')),
+    yaxis=dict(gridcolor='#EEF1F5', linecolor='#E1E5EB', zerolinecolor='#E1E5EB',
+               tickfont=dict(color='#5A6478', family='JetBrains Mono')),
     margin=dict(l=10, r=10, t=20, b=10),
     showlegend=False,
 )
 
-ACCENT = '#f5d442'
-CORAL = '#ff6b6b'
-MINT = '#5eead4'
-LILAC = '#a78bfa'
-AMBER = '#fb923c'
-SUBTLE = '#3a3d48'
+NAVY = '#1F3868'
+BLUE = '#2E5BA8'
+RED = '#C8102E'
+ORANGE = '#E37222'
+GREEN = '#0E8A6E'
+PURPLE = '#7B5BA6'
+GRAY = '#98A0AE'
 
 # =====================================================================
-# САЙДБАР: ПОРОГИ
+# САЙДБАР
 # =====================================================================
 with st.sidebar:
     st.markdown("# Настройки")
-    st.markdown('<div style="color:var(--text-dim);font-size:0.85rem;margin-bottom:1.4rem;font-family:Manrope;">Подкручивайте — таблица пересчитается.</div>', unsafe_allow_html=True)
+    st.markdown('<div style="color:var(--text-dim);font-size:0.86rem;margin-bottom:1.2rem;">Подкручивайте — таблица пересчитается.</div>', unsafe_allow_html=True)
 
     with st.expander("🔻 Хищение", expanded=True):
         cfg_theft_drop = st.slider("Падение, %", 20, 95, 50, 5) / 100
@@ -525,13 +554,13 @@ config = {
 }
 
 # =====================================================================
-# ШАПКА
+# ШАПКА (как обложка слайда Россети)
 # =====================================================================
 st.markdown("""
 <div class="hero">
-  <h1 class="hero-title">Анализ <em>аномального</em><br/>потребления</h1>
+  <h1 class="hero-title">АНАЛИЗ <em>АНОМАЛЬНОГО</em><br/>ПОТРЕБЛЕНИЯ</h1>
   <div class="hero-meta">
-    <b>⚡ Энергоучёт</b><br/>
+    <b>⚡ ЭНЕРГОУЧЁТ</b><br/>
     Реестр абонентов с флагами<br/>
     Данные не сохраняются
   </div>
@@ -550,8 +579,8 @@ uploaded = st.file_uploader(
 if not uploaded:
     st.markdown("""
     <div class="empty-state">
-      Перетащите выгрузку выше, чтобы начать анализ.<br/>
-      <span style="font-size:0.85rem;font-style:normal;font-family:'JetBrains Mono',monospace;color:var(--text-faint);">Минимум: столбцы вида «Январь 2024», «Февраль 2024»…</span>
+      Перетащите выгрузку выше, чтобы начать анализ
+      <span class="small">Минимум: столбцы вида «Январь 2024», «Февраль 2024»…</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -600,21 +629,21 @@ n_high_risk = int((registry['кол-во_флагов'] >= 3).sum())
 
 st.markdown(f"""
 <div class="metric-strip">
-  <div class="metric-cell" style="--cell-accent:var(--lilac);">
+  <div class="metric-cell" style="--cell-accent:var(--navy);">
     <div class="metric-label">Абонентов в файле</div>
     <div class="metric-value">{report['total_rows']:,}</div>
   </div>
-  <div class="metric-cell" style="--cell-accent:var(--mint);">
+  <div class="metric-cell" style="--cell-accent:var(--blue);">
     <div class="metric-label">Месяцев данных</div>
-    <div class="metric-value">{report['months_detected']}</div>
+    <div class="metric-value blue">{report['months_detected']}</div>
   </div>
-  <div class="metric-cell" style="--cell-accent:var(--accent);">
+  <div class="metric-cell" style="--cell-accent:var(--orange);">
     <div class="metric-label">С флагами</div>
-    <div class="metric-value accent">{n_with_flags:,}</div>
+    <div class="metric-value" style="color:var(--orange);">{n_with_flags:,}</div>
   </div>
-  <div class="metric-cell" style="--cell-accent:var(--coral);">
+  <div class="metric-cell" style="--cell-accent:var(--red);">
     <div class="metric-label">Высокий риск (3+ флага)</div>
-    <div class="metric-value coral">{n_high_risk:,}</div>
+    <div class="metric-value red">{n_high_risk:,}</div>
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -634,13 +663,13 @@ with st.expander(f"Период: {report['period_range']} · что распоз
             for f in report['flags_skipped']:
                 st.markdown(
                     f'<div style="margin:0.3rem 0;font-size:0.88rem;">'
-                    f'<span class="mono" style="color:var(--accent);">{f["name"]}</span> '
+                    f'<span class="mono" style="color:var(--blue);font-weight:500;">{f["name"]}</span> '
                     f'<span style="color:var(--text-dim);">— {f["reason"]}</span></div>',
                     unsafe_allow_html=True
                 )
         else:
             st.markdown('<div class="section-label">Все флаги вычислены</div>', unsafe_allow_html=True)
-            st.markdown('<div style="color:var(--mint);font-family:JetBrains Mono;">✓ полный набор</div>', unsafe_allow_html=True)
+            st.markdown('<div style="color:var(--green);font-family:JetBrains Mono;font-weight:500;">✓ полный набор</div>', unsafe_allow_html=True)
 
 # =====================================================================
 # ВКЛАДКИ
@@ -655,14 +684,14 @@ with tab_summary:
         st.markdown('<div class="section-label">Распределение</div>', unsafe_allow_html=True)
         st.markdown('<div class="section-title">По числу флагов</div>', unsafe_allow_html=True)
         flag_counts = registry['кол-во_флагов'].value_counts().sort_index()
-        # градиент: 0 — серый, 1 — мята, 2 — жёлтый, 3+ — коралл
-        scale = {0: SUBTLE, 1: MINT, 2: ACCENT, 3: AMBER, 4: CORAL, 5: CORAL}
-        colors = [scale.get(int(k), CORAL) for k in flag_counts.index]
+        # шкала: 0—серый, 1—синий, 2—голубой, 3—оранж, 4+—красный (как svetofor)
+        scale = {0: GRAY, 1: NAVY, 2: BLUE, 3: ORANGE, 4: RED, 5: RED}
+        colors = [scale.get(int(k), RED) for k in flag_counts.index]
         fig = go.Figure(go.Bar(
             x=flag_counts.index.astype(int).astype(str), y=flag_counts.values,
             text=flag_counts.values, textposition='outside',
-            marker=dict(color=colors, line=dict(color=colors, width=0)),
-            textfont=dict(family='JetBrains Mono', color='#ececf0', size=12),
+            marker=dict(color=colors),
+            textfont=dict(family='JetBrains Mono', color='#1A1F2C', size=12),
             hovertemplate='<b>%{x} флагов</b><br>%{y} абонентов<extra></extra>',
         ))
         fig.update_layout(**PLOTLY_LAYOUT, height=320,
@@ -674,7 +703,7 @@ with tab_summary:
         st.markdown('<div class="section-title">Каждого флага</div>', unsafe_allow_html=True)
         flag_names = [f['name'] for f in FLAG_DEFINITIONS if f['name'] in flags.columns]
         flag_data = sorted(
-            [(FLAG_TITLES.get(n, n), int(flags[n].sum()), FLAG_COLOR.get(n, CORAL)) for n in flag_names],
+            [(FLAG_TITLES.get(n, n), int(flags[n].sum()), FLAG_COLOR.get(n, RED)) for n in flag_names],
             key=lambda x: x[1]
         )
         fig2 = go.Figure(go.Bar(
@@ -684,7 +713,7 @@ with tab_summary:
             textposition='outside',
             orientation='h',
             marker=dict(color=[c for _, _, c in flag_data]),
-            textfont=dict(family='JetBrains Mono', color='#ececf0', size=12),
+            textfont=dict(family='JetBrains Mono', color='#1A1F2C', size=12),
             hovertemplate='<b>%{y}</b><br>%{x} абонентов<extra></extra>',
         ))
         fig2.update_layout(**PLOTLY_LAYOUT, height=320,
@@ -694,12 +723,12 @@ with tab_summary:
     st.markdown('<div class="section-label">Сезонная классификация</div>', unsafe_allow_html=True)
     st.markdown('<div class="section-title">По характеру потребления</div>', unsafe_allow_html=True)
     seas = registry['сезонность'].value_counts()
-    season_color = {'круглогодичный': MINT, 'летний (дача)': ACCENT,
-                    'зимний (отопление)': CORAL, 'нет данных': SUBTLE}
+    season_color = {'круглогодичный': NAVY, 'летний (дача)': ORANGE,
+                    'зимний (отопление)': BLUE, 'нет данных': GRAY}
     fig3 = go.Figure(go.Bar(
         x=seas.index, y=seas.values, text=seas.values, textposition='outside',
-        marker_color=[season_color.get(k, SUBTLE) for k in seas.index],
-        textfont=dict(family='JetBrains Mono', color='#ececf0', size=12),
+        marker_color=[season_color.get(k, GRAY) for k in seas.index],
+        textfont=dict(family='JetBrains Mono', color='#1A1F2C', size=12),
         hovertemplate='<b>%{x}</b><br>%{y} абонентов<extra></extra>',
     ))
     fig3.update_layout(**PLOTLY_LAYOUT, height=280,
@@ -738,8 +767,8 @@ with tab_registry:
     st.markdown(
         f'<div style="font-family:JetBrains Mono,monospace;font-size:0.78rem;'
         f'color:var(--text-dim);text-transform:uppercase;letter-spacing:0.14em;'
-        f'margin:0.5rem 0 0.8rem 0;">'
-        f'Показано <span style="color:var(--accent);">{len(view):,}</span> из {len(registry):,} абонентов'
+        f'margin:0.5rem 0 0.8rem 0;font-weight:500;">'
+        f'Показано <span style="color:var(--red);">{len(view):,}</span> из {len(registry):,} абонентов'
         f'</div>',
         unsafe_allow_html=True
     )
@@ -748,12 +777,33 @@ with tab_registry:
     excel_buf = io.BytesIO()
     with pd.ExcelWriter(excel_buf, engine='openpyxl') as w:
         display_view.to_excel(w, index=False, sheet_name='Реестр')
-    st.download_button(
-        "Скачать реестр (Excel)",
-        data=excel_buf.getvalue(),
-        file_name="реестр_аномалий.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+
+    # Полный отчёт (все листы, все абоненты с флагами)
+    full_report_bytes = build_full_report(
+        df_raw, registry, base, flags, report, config,
+        FLAG_TITLES, FLAG_EMOJI, METRIC_LABELS,
+        detect_month_columns(df_raw),
     )
+
+    dl1, dl2 = st.columns(2)
+    with dl1:
+        st.download_button(
+            "📊 Сводный отчёт (Excel)",
+            data=full_report_bytes,
+            file_name=f"анализ_потребления_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            help="Полный отчёт: сводка, реестр, потребление по флагам, отдельные листы по каждому флагу, настройки",
+            use_container_width=True,
+        )
+    with dl2:
+        st.download_button(
+            "📋 Только текущая выборка",
+            data=excel_buf.getvalue(),
+            file_name=f"выборка_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            help="Только то, что отфильтровано выше",
+            use_container_width=True,
+        )
 
 # ----- АБОНЕНТ -----
 with tab_detail:
@@ -785,11 +835,11 @@ with tab_detail:
         fig.add_trace(go.Scatter(
             x=[p.to_timestamp() for p in periods], y=s.values,
             mode='lines+markers',
-            line=dict(color=ACCENT, width=1.6),
-            marker=dict(size=5, color=ACCENT, line=dict(color='#0a0b0f', width=1)),
+            line=dict(color=NAVY, width=2),
+            marker=dict(size=5, color=NAVY, line=dict(color='#FFFFFF', width=1)),
             connectgaps=False,
             fill='tozeroy',
-            fillcolor='rgba(245, 212, 66, 0.08)',
+            fillcolor='rgba(31, 56, 104, 0.08)',
             hovertemplate='<b>%{x|%b %Y}</b><br>%{y:,.0f} кВт·ч<extra></extra>',
         ))
         fig.update_layout(**PLOTLY_LAYOUT, height=400,
@@ -804,7 +854,7 @@ with tab_detail:
             if row_flags:
                 html = ""
                 for n in row_flags:
-                    color = FLAG_COLOR.get(n, ACCENT)
+                    color = FLAG_COLOR.get(n, NAVY)
                     html += (f'<div class="flag-row" style="--flag-color:{color};">'
                              f'<span class="emoji">{FLAG_EMOJI.get(n,"🚩")}</span>'
                              f'<span class="name">{FLAG_TITLES.get(n,n)}</span></div>')
@@ -847,6 +897,21 @@ with tab_detail:
                                  f'<span class="kv-val">{v}</span></div>')
             html += '</div>'
             st.markdown(html, unsafe_allow_html=True)
+
+        # ----- Скачать карточку абонента -----
+        st.markdown('<div style="margin-top:1.5rem;"></div>', unsafe_allow_html=True)
+        card_bytes = build_subscriber_card(
+            df_raw, registry, base, flags, selected,
+            FLAG_TITLES, FLAG_EMOJI, METRIC_LABELS,
+            detect_month_columns(df_raw),
+        )
+        st.download_button(
+            "📄 Карточка абонента (Excel)",
+            data=card_bytes,
+            file_name=f"абонент_{selected}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            help="Метаданные + флаги + метрики + помесячное потребление в одном файле",
+        )
 
 # =====================================================================
 # ПОДВАЛ
