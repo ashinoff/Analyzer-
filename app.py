@@ -1,6 +1,7 @@
 """
 Streamlit-приложение: анализ аномального потребления.
-Стиль: корпоративный (по образцу Россети Кубань) — светлый фон, navy и красный акценты.
+Стиль: editorial data publication — bone bg · ink fg · rust accent · moss for ok.
+Шрифты: Instrument Serif (display) · Geist (text) · JetBrains Mono (data).
 """
 import streamlit as st
 import pandas as pd
@@ -60,12 +61,12 @@ FLAG_TITLES = {
 }
 
 FLAG_COLOR = {
-    'подозрение_хищение':   '#C8102E',  # красный (Россети)
-    'долгое_молчание':      '#5A6F8E',  # серо-синий
-    'превышение_мощности':  '#E37222',  # оранжевый
-    'нестабильность':       '#0E8A6E',  # бирюзово-зелёный
-    'одинаковые_подряд':    '#7B5BA6',  # фиолетовый
-    'аномалия_в_когорте':   '#1F3868',  # navy
+    'подозрение_хищение':   '#B5432C',  # rust — основной флаг риска
+    'долгое_молчание':      '#4A5A6B',  # slate
+    'превышение_мощности':  '#C7873A',  # amber
+    'нестабильность':       '#5A6B3D',  # moss
+    'одинаковые_подряд':    '#6B3F5F',  # plum
+    'аномалия_в_когорте':   '#8C2F1E',  # rust-deep
 }
 
 # =====================================================================
@@ -73,527 +74,471 @@ FLAG_COLOR = {
 # =====================================================================
 CSS = """
 <style>
-/* Material Symbols — дублирующая загрузка с jsdelivr на случай блокировки Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined');
-@import url('https://cdn.jsdelivr.net/npm/material-icons@1.13.12/iconfont/material-icons.css');
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600;700;800;900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-    --navy:        #1F3868;       /* основной корпоративный (фон обложек Россети) */
-    --navy-deep:   #142647;       /* темнее navy */
-    --blue:        #2E5BA8;       /* акцентный синий */
-    --blue-light:  #5891CA;       /* светло-синий */
-    --sky:         #B8D4ED;       /* небесный для фонов */
-    --red:         #C8102E;       /* красный (флаг "опасно") */
-    --orange:      #E37222;       /* оранжевый */
-    --green:       #0E8A6E;       /* зелёный (позитивные показатели) */
-    --purple:      #7B5BA6;
-    --gold:        #C9A227;
+    --bone:        #F2EDE2;
+    --bone-deep:   #ECE5D5;
+    --paper:       #FBF8F1;
+    --ink:         #181513;
+    --ink-soft:    #3A332C;
+    --ink-dim:     #6F6557;
+    --ink-faint:   #A89E8C;
+    --rule:        #D4CCBA;
+    --rule-soft:   #E2DBC8;
+    --rust:        #B5432C;
+    --rust-deep:   #8C2F1E;
+    --rust-soft:   #F2D9CF;
+    --moss:        #5A6B3D;
+    --amber:       #C7873A;
+    --plum:        #6B3F5F;
+    --slate:       #4A5A6B;
 
-    --bg:          #FFFFFF;
-    --bg-soft:     #F4F6FA;       /* очень светлый фон карточек */
-    --bg-card:     #FFFFFF;
-    --border:      #E1E5EB;
-    --border-soft: #EEF1F5;
-    --text:        #1A1F2C;
-    --text-dim:    #5A6478;
-    --text-faint:  #98A0AE;
+    --display: 'Instrument Serif', 'Times New Roman', serif;
+    --sans: 'Geist', system-ui, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
-/* фон */
-.stApp { background: var(--bg) !important; }
-
+/* base */
+.stApp { background: var(--bone) !important; }
 html, body, [class*="css"], .stApp, .stApp * {
-    font-family: 'Manrope', system-ui, sans-serif;
-    color: var(--text);
+    font-family: var(--sans);
+    color: var(--ink);
 }
-
-/* убираем дефолтные элементы */
 header[data-testid="stHeader"] { background: transparent !important; height: 0; }
 .stDeployButton, #MainMenu, footer { display: none !important; }
-.block-container { padding-top: 1.5rem !important; }
+.block-container { padding-top: 1.4rem !important; max-width: 1400px; }
 
-/* типографика */
-h1, h2, h3, .display-font {
-    font-family: 'Barlow Condensed', sans-serif !important;
-    font-weight: 700;
-    letter-spacing: -0.005em;
-    color: var(--navy);
-    text-transform: uppercase;
-}
-h1 { font-size: 3rem !important; line-height: 1; letter-spacing: 0.01em; }
+h1, h2, h3 { font-family: var(--display) !important; font-weight: 400; letter-spacing: -0.01em; color: var(--ink); }
+h1 { font-size: 2.6rem !important; line-height: 1; }
 h2 { font-size: 1.6rem !important; }
+.mono { font-family: var(--mono) !important; }
 
-.mono { font-family: 'JetBrains Mono', monospace !important; }
-
-/* ========= HERO (как обложка слайда Россети: navy блок) ========= */
+/* ========= HERO (editorial masthead) ========= */
 .hero {
-    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-deep) 100%);
-    color: #FFFFFF;
-    padding: 2rem 2.4rem;
-    margin: 0 -1rem 2rem -1rem;
+    border-top: 3px solid var(--ink);
+    border-bottom: 1px solid var(--ink);
+    padding: 1.4rem 0 1rem;
+    margin: 0.4rem 0 1.5rem;
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: baseline;
     gap: 2rem;
-    position: relative;
-    overflow: hidden;
-}
-/* красный треугольник в стиле обложки Россети */
-.hero::before {
-    content: '';
-    position: absolute;
-    top: 0; right: 0;
-    width: 0; height: 0;
-    border-style: solid;
-    border-width: 0 110px 110px 0;
-    border-color: transparent var(--red) transparent transparent;
-    opacity: 0.92;
-}
-.hero::after {
-    content: '';
-    position: absolute;
-    top: 0; right: 110px;
-    width: 0; height: 0;
-    border-style: solid;
-    border-width: 0 80px 80px 0;
-    border-color: transparent var(--blue-light) transparent transparent;
-    opacity: 0.7;
-}
-/* === BUILD v5 === */
-/* ВЕСЬ заголовок белый — включая «аномального». Каждый возможный селектор. */
-.stApp .hero,
-.stApp .hero h1,
-.stApp .hero .hero-title,
-.stApp div.hero h1.hero-title,
-.stApp .hero .hero-title *,
-div.hero h1,
-div.hero h1 *,
-.hero h1,
-.hero h1 *,
-.hero-title,
-.hero-title *,
-.hero-em {
-    color: #FFFFFF !important;
-}
-.hero-title {
-    font-family: 'Barlow Condensed', sans-serif !important;
-    font-weight: 800;
-    font-size: 3.4rem;
-    letter-spacing: 0.005em;
-    line-height: 0.96;
-    margin: 0;
-    text-transform: uppercase;
-    position: relative;
-    z-index: 2;
-}
-.hero-em {
-    font-style: normal;
-    font-weight: 300;
-    border-bottom: 4px solid #C8102E;
-    padding-bottom: 2px;
-}
-.hero-meta {
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 0.72rem;
-    color: rgba(255, 255, 255, 0.78) !important;
+    font-family: var(--mono);
+    font-size: 0.66rem;
     text-transform: uppercase;
     letter-spacing: 0.18em;
-    text-align: right;
-    line-height: 1.7;
-    white-space: nowrap;
-    position: relative;
-    z-index: 2;
-    padding-right: 90px;
+    color: var(--ink-dim);
 }
-.hero-meta .badge {
-    display: inline-block;
-    color: #FFFFFF !important;
-    font-weight: 600;
-    border-left: 3px solid #C8102E;
-    padding-left: 8px;
-    margin-bottom: 4px;
+.hero .brand { display: flex; align-items: baseline; gap: 14px; }
+.hero .brand-mark {
+    font-family: var(--display) !important;
+    font-style: italic;
+    font-size: 1.6rem;
+    letter-spacing: -0.005em;
+    color: var(--ink) !important;
+    text-transform: none;
+}
+.hero .brand-tag { border-left: 1px solid var(--rule); padding-left: 14px; color: var(--ink-dim); }
+.hero .meta { display: flex; gap: 28px; }
+.hero .meta b { color: var(--ink); font-weight: 500; }
+
+.headline {
+    padding: 0 0 1.6rem;
+    border-bottom: 1px solid var(--ink);
+    margin-bottom: 1.6rem;
+}
+.headline h1 {
+    font-family: var(--display) !important;
+    font-weight: 400 !important;
+    font-size: clamp(3rem, 6vw, 5.4rem) !important;
+    line-height: 0.94 !important;
+    letter-spacing: -0.012em !important;
+    margin: 0 !important;
+    color: var(--ink) !important;
+    text-transform: none !important;
+}
+.headline h1 em {
+    font-style: italic;
+    color: var(--rust);
+    font-weight: 400;
+}
+.headline .deck {
+    font-family: var(--display) !important;
+    font-style: italic;
+    font-size: 1.15rem;
+    line-height: 1.35;
+    color: var(--ink-soft);
+    border-left: 2px solid var(--ink);
+    padding: 0.2rem 0 0.2rem 0.9rem;
+    margin-top: 1.2rem;
+    max-width: 560px;
 }
 
-/* ========= ЛЕНТА МЕТРИК ========= */
+/* ========= KPI strip ========= */
 .metric-strip {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-    margin-bottom: 2rem;
+    border-top: 1px solid var(--ink);
+    border-bottom: 1px solid var(--ink);
+    margin: 1.6rem 0 2rem;
 }
 .metric-cell {
-    padding: 1.4rem 1.5rem;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-top: 4px solid var(--cell-accent, var(--navy));
-    border-radius: 2px;
-    transition: box-shadow 0.2s;
+    padding: 1.2rem 1.4rem 1.4rem;
+    border-right: 1px solid var(--rule);
+    background: transparent;
 }
-.metric-cell:hover { box-shadow: 0 4px 12px rgba(31, 56, 104, 0.08); }
+.metric-cell:last-child { border-right: none; }
 .metric-label {
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 0.66rem;
+    font-family: var(--mono) !important;
+    font-size: 0.6rem;
     text-transform: uppercase;
-    letter-spacing: 0.2em;
-    color: var(--text-dim);
-    margin-bottom: 0.7rem;
+    letter-spacing: 0.18em;
+    color: var(--ink-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-weight: 500;
 }
-.metric-value {
-    font-family: 'Barlow Condensed', sans-serif !important;
-    font-weight: 700;
-    font-size: 3rem;
-    line-height: 1;
-    color: var(--navy);
+.metric-label::before {
+    content: '';
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--cell-accent, var(--ink));
+    display: inline-block;
 }
-.metric-value.red { color: var(--red); }
-.metric-value.green { color: var(--green); }
-.metric-value.blue { color: var(--blue); }
+.metric-value {
+    font-family: var(--display) !important;
+    font-weight: 400;
+    font-size: 3.6rem;
+    line-height: 1;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+    margin-top: 0.9rem;
+    font-variant-numeric: tabular-nums;
+}
+.metric-value.rust  { color: var(--rust); }
+.metric-value.amber { color: var(--amber); }
+.metric-value.moss  { color: var(--moss); }
 
-/* ========= СЕКЦИОННЫЕ ЗАГОЛОВКИ ========= */
+/* ========= Section heads ========= */
 .section-label {
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 0.7rem;
+    font-family: var(--mono) !important;
+    font-size: 0.62rem;
     text-transform: uppercase;
-    letter-spacing: 0.22em;
-    color: var(--blue);
-    margin: 2rem 0 0.4rem 0;
+    letter-spacing: 0.2em;
+    color: var(--rust);
+    margin: 1.6rem 0 0.4rem 0;
     font-weight: 500;
 }
 .section-title {
-    font-family: 'Barlow Condensed', sans-serif !important;
-    font-weight: 600;
-    font-size: 1.7rem;
+    font-family: var(--display) !important;
+    font-weight: 400;
+    font-size: 2rem;
     line-height: 1.05;
-    text-transform: uppercase;
-    color: var(--navy);
-    margin: 0.2rem 0 1.3rem 0;
-    padding-bottom: 0.7rem;
-    border-bottom: 2px solid var(--navy);
+    color: var(--ink);
+    margin: 0.1rem 0 1.2rem 0;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--ink);
+    letter-spacing: -0.01em;
 }
+.section-title em { font-style: italic; color: var(--rust); }
 
-/* ========= ФЛАГИ ========= */
+/* ========= Flags ========= */
 .flag-row {
     display: flex;
     align-items: center;
     gap: 0.8rem;
-    padding: 0.7rem 1rem;
+    padding: 0.7rem 0.9rem;
     margin-bottom: 0.5rem;
-    background: var(--bg-soft);
-    border-left: 4px solid var(--flag-color, var(--navy));
-    transition: transform 0.15s ease, box-shadow 0.15s;
+    background: var(--paper);
+    border-left: 3px solid var(--flag-color, var(--rust));
 }
-.flag-row:hover {
-    transform: translateX(3px);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-}
-.flag-row .emoji { font-size: 1.05rem; }
-.flag-row .name {
-    font-family: 'Manrope', sans-serif;
-    font-weight: 500;
-    color: var(--text);
+.flag-row .emoji {
+    font-family: var(--mono) !important;
     font-size: 0.95rem;
+    color: var(--flag-color, var(--rust));
+    font-weight: 600;
+}
+.flag-row .name {
+    font-family: var(--sans);
+    font-weight: 500;
+    color: var(--ink);
+    font-size: 0.92rem;
 }
 .flag-empty {
     padding: 0.9rem 1.1rem;
-    color: var(--green);
-    background: rgba(14, 138, 110, 0.08);
-    border-left: 4px solid var(--green);
+    color: var(--moss);
+    background: var(--paper);
+    border-left: 3px solid var(--moss);
     font-weight: 500;
+    font-family: var(--sans);
 }
 
-/* ========= KEY-VALUE ========= */
-.kv-list { font-family: 'Manrope', sans-serif; }
+/* ========= KV list ========= */
+.kv-list {
+    font-family: var(--sans);
+    border-top: 1px solid var(--rule);
+}
 .kv-row {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
     padding: 0.55rem 0;
-    border-bottom: 1px dashed var(--border);
+    border-bottom: 1px dashed var(--rule);
     gap: 1rem;
 }
-.kv-row:last-child { border-bottom: none; }
-.kv-key { color: var(--text-dim); font-size: 0.86rem; }
+.kv-key { color: var(--ink-dim); font-size: 0.84rem; }
 .kv-val {
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 0.92rem;
-    color: var(--text);
+    font-family: var(--mono) !important;
+    font-size: 0.86rem;
+    color: var(--ink);
     text-align: right;
     font-weight: 500;
     word-break: break-word;
+    font-variant-numeric: tabular-nums;
 }
 
-/* ========= ТАБЫ ========= */
+/* ========= Tabs ========= */
 .stTabs [data-baseweb="tab-list"] {
-    gap: 0;
-    border-bottom: 2px solid var(--border);
+    gap: 28px;
+    border-bottom: 1px solid var(--ink);
     background: transparent;
 }
 .stTabs [data-baseweb="tab"] {
-    font-family: 'Barlow Condensed', sans-serif !important;
-    font-size: 1.05rem !important;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 0.7rem 1.6rem;
-    color: var(--text-dim);
+    font-family: var(--display) !important;
+    font-size: 1.4rem !important;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: -0.005em;
+    padding: 0.7rem 0;
+    color: var(--ink-dim);
     background: transparent;
     border: none;
-    border-bottom: 3px solid transparent;
-    margin-bottom: -2px;
-    transition: color 0.2s, border-color 0.2s;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
 }
-.stTabs [data-baseweb="tab"]:hover { color: var(--navy); }
+.stTabs [data-baseweb="tab"]:hover { color: var(--ink); }
 .stTabs [aria-selected="true"] {
-    color: var(--navy) !important;
-    border-bottom-color: var(--red) !important;
+    color: var(--ink) !important;
+    border-bottom-color: var(--rust) !important;
 }
 
-/* ========= САЙДБАР ========= */
+/* ========= Sidebar ========= */
 [data-testid="stSidebar"] {
-    background: var(--bg-soft) !important;
-    border-right: 1px solid var(--border);
+    background: var(--bone-deep) !important;
+    border-right: 1px solid var(--rule);
 }
 [data-testid="stSidebar"] h1 {
-    font-family: 'Barlow Condensed', sans-serif !important;
-    font-size: 1.8rem !important;
-    font-weight: 700;
-    color: var(--navy);
-    margin-bottom: 0.4rem;
-    text-transform: uppercase;
+    font-family: var(--display) !important;
+    font-size: 1.9rem !important;
+    font-weight: 400;
+    color: var(--ink);
+    margin-bottom: 0.2rem;
+    text-transform: none;
+    letter-spacing: -0.01em;
 }
 [data-testid="stSidebar"] [data-testid="stExpander"] {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 2px;
-    margin-bottom: 0.5rem;
+    background: transparent;
+    border: 0;
+    border-top: 1px solid var(--ink);
+    border-radius: 0;
+    margin-bottom: 0;
 }
+[data-testid="stSidebar"] [data-testid="stExpander"]:last-of-type { border-bottom: 1px solid var(--ink); }
 [data-testid="stSidebar"] [data-testid="stExpander"] summary {
-    font-family: 'Manrope', sans-serif !important;
-    font-weight: 600;
-    color: var(--navy);
+    font-family: var(--sans) !important;
+    font-weight: 500;
+    color: var(--ink);
+    padding: 0.8rem 0 !important;
 }
 
-/* ========= СЛАЙДЕРЫ — синий navy ========= */
+/* sliders — ink */
 .stSlider [data-baseweb="slider"] > div > div > div {
-    background: var(--navy) !important;
+    background: var(--ink) !important;
 }
 .stSlider [role="slider"] {
-    background-color: var(--navy) !important;
-    border-color: var(--navy) !important;
-    box-shadow: 0 0 0 4px rgba(31, 56, 104, 0.15) !important;
+    background-color: var(--ink) !important;
+    border-color: var(--bone-deep) !important;
+    box-shadow: 0 0 0 3px rgba(24, 21, 19, 0.12) !important;
 }
 .stSlider [data-baseweb="tooltip"] > div {
-    background: var(--navy) !important;
-    color: #FFFFFF !important;
-    font-family: 'JetBrains Mono', monospace !important;
+    background: var(--ink) !important;
+    color: var(--paper) !important;
+    font-family: var(--mono) !important;
     font-weight: 600;
 }
 
 /* number input */
 .stNumberInput input {
-    background: var(--bg) !important;
-    color: var(--text) !important;
-    border: 1px solid var(--border) !important;
-    font-family: 'JetBrains Mono', monospace !important;
+    background: var(--paper) !important;
+    color: var(--ink) !important;
+    border: 1px solid var(--rule) !important;
+    border-radius: 0 !important;
+    font-family: var(--mono) !important;
 }
 
 /* select */
 .stSelectbox > div > div, .stMultiSelect > div > div {
-    background: var(--bg) !important;
-    border: 1px solid var(--border) !important;
+    background: var(--paper) !important;
+    border: 1px solid var(--rule) !important;
+    border-radius: 0 !important;
 }
 
-/* ========= КНОПКИ ========= */
+/* ========= Buttons ========= */
 .stDownloadButton button, .stButton button,
 [data-testid="stDownloadButton"] button,
 [data-testid="stBaseButton-secondary"],
 [data-testid="stBaseButton-primary"] {
-    background: var(--navy) !important;
-    color: #FFFFFF !important;
+    background: var(--ink) !important;
+    color: var(--paper) !important;
     border: none !important;
-    font-family: 'Barlow Condensed', sans-serif !important;
-    font-weight: 600 !important;
-    font-size: 1rem !important;
+    font-family: var(--mono) !important;
+    font-weight: 500 !important;
+    font-size: 0.7rem !important;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    padding: 0.7rem 1.8rem !important;
-    border-radius: 2px !important;
-    transition: background 0.15s, transform 0.1s;
+    letter-spacing: 0.18em;
+    padding: 0.85rem 1.6rem !important;
+    border-radius: 0 !important;
+    transition: background 0.15s;
 }
-/* белый текст также для всех потомков (p, span, div внутри button) */
 .stDownloadButton button *, .stButton button *,
-[data-testid="stDownloadButton"] button *,
-[data-testid="stDownloadButton"] button p,
-[data-testid="stDownloadButton"] button span,
-[data-testid="stDownloadButton"] button div {
-    color: #FFFFFF !important;
+[data-testid="stDownloadButton"] button * {
+    color: var(--paper) !important;
 }
 .stDownloadButton button:hover, .stButton button:hover,
 [data-testid="stDownloadButton"] button:hover {
-    background: var(--red) !important;
-    transform: translateY(-1px);
+    background: var(--rust) !important;
 }
 
-/* ========= ОТКЛЮЧАЕМ MATERIAL ICONS (если CDN заблокирован) ========= */
-/* Если Google Fonts недоступны, Streamlit показывает голые имена иконок
-   ("arrow_drop_down", "upload" и т.д.). Прячем их везде. */
-.material-icons,
-.material-icons-outlined,
-.material-symbols-outlined,
-[class*="material-icons"],
-[class*="material-symbols"],
-[data-testid="stIconMaterial"],
-[data-testid*="ToggleIcon"] {
+/* hide material icons */
+.material-icons, .material-icons-outlined, .material-symbols-outlined,
+[class*="material-icons"], [class*="material-symbols"],
+[data-testid="stIconMaterial"], [data-testid*="ToggleIcon"] {
     font-size: 0 !important;
     visibility: hidden !important;
-    width: 0 !important;
-    height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    width: 0 !important; height: 0 !important;
+    margin: 0 !important; padding: 0 !important;
     overflow: hidden !important;
     display: inline-block !important;
 }
-
-/* Возвращаем индикатор открыт/закрыт у expander через текстовый символ */
-[data-testid="stExpander"] details > summary {
-    position: relative;
-    padding-right: 1.8rem !important;
-}
+[data-testid="stExpander"] details > summary { position: relative; padding-right: 1.8rem !important; }
 [data-testid="stExpander"] details > summary::after {
-    content: "▾";
-    position: absolute;
-    right: 0.8rem;
-    top: 50%;
+    content: "+";
+    position: absolute; right: 0.8rem; top: 50%;
     transform: translateY(-50%);
-    color: var(--text-dim);
-    font-size: 0.85rem;
-    transition: transform 0.2s;
+    color: var(--ink-dim);
+    font-family: var(--mono) !important;
+    font-size: 1rem;
     visibility: visible !important;
-    width: auto !important;
-    height: auto !important;
+    width: auto !important; height: auto !important;
 }
-[data-testid="stExpander"] details[open] > summary::after {
-    content: "▴";
-}
+[data-testid="stExpander"] details[open] > summary::after { content: "−"; }
+
+/* file uploader */
 [data-testid="stFileUploaderDropzone"] {
-    background: var(--bg-soft) !important;
-    border: 2px dashed var(--blue-light) !important;
-    border-radius: 2px !important;
-    padding: 1.2rem 1.5rem !important;
+    background: var(--paper) !important;
+    border: 1.5px dashed var(--ink) !important;
+    border-radius: 0 !important;
+    padding: 1.4rem 1.8rem !important;
     min-height: 90px !important;
-    transition: border-color 0.2s, background 0.2s;
 }
 [data-testid="stFileUploaderDropzone"]:hover {
-    border-color: var(--navy) !important;
-    background: #FFFFFF !important;
+    border-color: var(--rust) !important;
+    background: #fff !important;
 }
-/* === КНОПКА «Загрузить» — text-indent trick =================
-   Прячем оригинальное содержимое за экран (text-indent: -9999px),
-   а наш текст рисуем поверх через ::after с position: absolute.
-   Этот способ работает независимо от вложенной структуры Streamlit. */
 section[data-testid="stFileUploaderDropzone"] > button,
 [data-testid="stFileUploaderDropzone"] > button {
-    background: #1F3868 !important;
-    color: #FFFFFF !important;
+    background: var(--ink) !important;
+    color: var(--paper) !important;
     border: none !important;
     padding: 0 !important;
-    width: 140px !important;
-    height: 40px !important;
-    min-width: 140px !important;
+    width: 150px !important;
+    height: 42px !important;
+    min-width: 150px !important;
     position: relative !important;
     text-indent: -9999px !important;
     overflow: hidden !important;
-    white-space: nowrap !important;
-    border-radius: 2px !important;
+    border-radius: 0 !important;
     cursor: pointer !important;
 }
 section[data-testid="stFileUploaderDropzone"] > button::after,
 [data-testid="stFileUploaderDropzone"] > button::after {
-    content: "Загрузить";
+    content: "ЗАГРУЗИТЬ →";
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
     display: flex !important;
     align-items: center;
     justify-content: center;
-    color: #FFFFFF !important;
-    font-family: 'Manrope', sans-serif !important;
+    color: var(--paper) !important;
+    font-family: var(--mono) !important;
     font-weight: 500 !important;
-    font-size: 0.95rem !important;
+    font-size: 0.7rem !important;
     text-indent: 0 !important;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.18em;
 }
 section[data-testid="stFileUploaderDropzone"] > button:hover,
 [data-testid="stFileUploaderDropzone"] > button:hover {
-    background: #C8102E !important;
+    background: var(--rust) !important;
 }
 
-/* === ТЕКСТ-ПОДСКАЗКА в drop zone (Drag and drop / Limit ...) === */
 [data-testid="stFileUploaderDropzoneInstructions"] {
     font-size: 0 !important;
     position: relative !important;
 }
-[data-testid="stFileUploaderDropzoneInstructions"] > * {
-    display: none !important;
-}
+[data-testid="stFileUploaderDropzoneInstructions"] > * { display: none !important; }
 [data-testid="stFileUploaderDropzoneInstructions"]::before {
-    content: "Перетащите Excel-файл сюда или нажмите «Загрузить» справа";
+    content: "Перетащите Excel-выгрузку сюда";
     display: block !important;
-    font-family: 'Manrope', sans-serif !important;
-    font-size: 0.95rem !important;
-    font-weight: 500 !important;
-    color: #1A1F2C !important;
+    font-family: var(--display) !important;
+    font-style: italic;
+    font-size: 1.4rem !important;
+    color: var(--ink) !important;
     text-indent: 0 !important;
 }
 [data-testid="stFileUploaderDropzoneInstructions"]::after {
-    content: "XLSX, XLS — до 200 МБ";
+    content: "XLSX · XLS · ДО 200 МБ";
     display: block !important;
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 0.72rem !important;
-    color: #5A6478 !important;
-    margin-top: 0.4rem;
-    letter-spacing: 0.05em;
+    font-family: var(--mono) !important;
+    font-size: 0.62rem !important;
+    color: var(--ink-dim) !important;
+    margin-top: 0.5rem;
+    letter-spacing: 0.2em;
     text-indent: 0 !important;
+    text-transform: uppercase;
 }
 
-/* === БЛОК ЗАГРУЖЕННОГО ФАЙЛА + ВИДИМЫЙ КРЕСТИК «✕» ============= */
-/* Сначала возвращаем материальные иконки/svg в этом блоке к жизни,
-   потому что общий material-icons hide их выключил */
+/* uploaded file block */
 [data-testid="stFileUploader"] svg,
 [data-testid="stFileUploaderFile"] *,
 [data-testid="stFileUploaderUploadedFile"] *,
 [data-testid="stFileUploaderDeleteBtn"] * {
     visibility: visible !important;
 }
-
 [data-testid="stFileUploaderFile"],
 [data-testid="stFileUploaderUploadedFile"] {
-    background: #F4F6FA !important;
-    border: 1px solid #E1E5EB !important;
-    border-radius: 2px !important;
-    padding: 0.5rem 0.8rem !important;
-    margin-top: 0.5rem !important;
+    background: var(--paper) !important;
+    border: 1px solid var(--rule) !important;
+    border-radius: 0 !important;
+    padding: 0.6rem 0.9rem !important;
+    margin-top: 0.6rem !important;
     display: flex !important;
     align-items: center !important;
 }
 
-/* Кнопка удаления — text-indent trick + ✕ через ::after */
 [data-testid="stFileUploaderDeleteBtn"],
 button[data-testid="stFileUploaderDeleteBtn"],
 [data-testid="stFileUploaderFile"] button,
 [data-testid="stFileUploaderUploadedFile"] button {
     visibility: visible !important;
     display: inline-flex !important;
-    width: 36px !important;
-    height: 36px !important;
+    width: 36px !important; height: 36px !important;
     min-width: 36px !important;
     padding: 0 !important;
     margin-left: 8px !important;
     background: transparent !important;
-    border: 1px solid #C8102E !important;
-    border-radius: 2px !important;
-    color: #C8102E !important;
+    border: 1px solid var(--rust) !important;
+    border-radius: 0 !important;
+    color: var(--rust) !important;
     position: relative !important;
     text-indent: -9999px !important;
     overflow: hidden !important;
@@ -602,105 +547,113 @@ button[data-testid="stFileUploaderDeleteBtn"],
 }
 [data-testid="stFileUploaderDeleteBtn"] *,
 [data-testid="stFileUploaderFile"] button > *,
-[data-testid="stFileUploaderUploadedFile"] button > * {
-    display: none !important;
-}
+[data-testid="stFileUploaderUploadedFile"] button > * { display: none !important; }
 [data-testid="stFileUploaderDeleteBtn"]::after,
 [data-testid="stFileUploaderFile"] button::after,
 [data-testid="stFileUploaderUploadedFile"] button::after {
     content: "✕";
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
     display: flex !important;
-    align-items: center;
-    justify-content: center;
-    color: #C8102E !important;
-    font-size: 1.1rem !important;
-    font-weight: 700 !important;
+    align-items: center; justify-content: center;
+    color: var(--rust) !important;
+    font-family: var(--mono) !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
     text-indent: 0 !important;
     visibility: visible !important;
 }
 [data-testid="stFileUploaderDeleteBtn"]:hover,
 [data-testid="stFileUploaderFile"] button:hover,
-[data-testid="stFileUploaderUploadedFile"] button:hover {
-    background: #C8102E !important;
-}
+[data-testid="stFileUploaderUploadedFile"] button:hover { background: var(--rust) !important; }
 [data-testid="stFileUploaderDeleteBtn"]:hover::after,
 [data-testid="stFileUploaderFile"] button:hover::after,
-[data-testid="stFileUploaderUploadedFile"] button:hover::after {
-    color: #FFFFFF !important;
-}
+[data-testid="stFileUploaderUploadedFile"] button:hover::after { color: var(--paper) !important; }
 
 /* dataframe */
 [data-testid="stDataFrame"] {
-    border: 1px solid var(--border);
-    border-radius: 2px;
+    border: 1px solid var(--ink);
+    border-radius: 0;
 }
 
 /* expander */
 [data-testid="stExpander"] {
-    border: 1px solid var(--border);
-    border-radius: 2px;
+    border: 1px solid var(--rule);
+    border-radius: 0;
+    background: var(--paper);
 }
 
 /* pills */
 .pill {
     display: inline-block;
     padding: 0.22rem 0.7rem;
-    border-radius: 2px;
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 0.74rem;
+    border-radius: 0;
+    font-family: var(--mono) !important;
+    font-size: 0.7rem;
     margin: 0.18rem 0.22rem 0.18rem 0;
-    border: 1px solid var(--border);
-    background: var(--bg-soft);
-    color: var(--text);
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    color: var(--ink);
+    letter-spacing: 0.04em;
 }
 .pill.found {
-    color: var(--green);
-    border-color: rgba(14, 138, 110, 0.3);
-    background: rgba(14, 138, 110, 0.05);
+    color: var(--moss);
+    border-color: var(--moss);
 }
 
-/* заглушка */
+/* empty pull-quote */
 .empty-state {
-    border: 1px dashed var(--border);
-    padding: 3rem 2rem;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 3.2rem 1rem 3.6rem;
     text-align: center;
-    color: var(--text-dim);
-    font-family: 'Barlow Condensed', sans-serif !important;
-    font-size: 1.6rem;
-    margin: 1rem 0;
-    background: var(--bg-soft);
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    font-weight: 400;
+    color: var(--ink-soft);
+    font-family: var(--display) !important;
+    font-size: 1.8rem;
+    margin: 1.4rem 0;
+    background: transparent;
+    text-transform: none;
+    letter-spacing: -0.005em;
+    line-height: 1.3;
+    font-style: italic;
+}
+.empty-state::before {
+    content: "00";
+    display: block;
+    font-family: var(--display) !important;
+    font-style: italic;
+    font-size: 4.2rem;
+    color: var(--rust);
+    line-height: 1;
+    margin-bottom: 1rem;
+    letter-spacing: -0.02em;
 }
 .empty-state .small {
-    text-transform: none;
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 0.8rem;
-    color: var(--text-faint);
-    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-family: var(--mono) !important;
+    font-size: 0.66rem;
+    color: var(--ink-dim);
+    letter-spacing: 0.18em;
     display: block;
-    margin-top: 0.7rem;
-    font-weight: 400;
+    margin-top: 1.2rem;
+    font-weight: 500;
+    font-style: normal;
 }
 
-/* подвал */
+/* footer */
 .footer-strip {
     margin-top: 3rem;
-    padding: 1.2rem 0;
-    border-top: 2px solid var(--navy);
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 0.7rem;
-    color: var(--text-dim);
+    padding: 1rem 0 0.8rem;
+    border-top: 1px solid var(--ink);
+    font-family: var(--mono) !important;
+    font-size: 0.62rem;
+    color: var(--ink-dim);
     text-transform: uppercase;
     letter-spacing: 0.2em;
     text-align: center;
 }
 
-/* Streamlit info/warning/error */
-.stAlert { border-radius: 2px !important; }
+/* alerts */
+.stAlert { border-radius: 0 !important; }
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -710,30 +663,39 @@ st.markdown(CSS, unsafe_allow_html=True)
 # =====================================================================
 PLOTLY_LAYOUT = dict(
     paper_bgcolor='rgba(0,0,0,0)',
-    plot_bgcolor='rgba(244, 246, 250, 0.4)',
-    font=dict(family='Manrope, sans-serif', color='#5A6478', size=11),
-    xaxis=dict(gridcolor='#EEF1F5', linecolor='#E1E5EB', zerolinecolor='#E1E5EB',
-               tickfont=dict(color='#5A6478', family='JetBrains Mono')),
-    yaxis=dict(gridcolor='#EEF1F5', linecolor='#E1E5EB', zerolinecolor='#E1E5EB',
-               tickfont=dict(color='#5A6478', family='JetBrains Mono')),
+    plot_bgcolor='rgba(0,0,0,0)',
+    font=dict(family='Geist, sans-serif', color='#6F6557', size=11),
+    xaxis=dict(gridcolor='#E2DBC8', linecolor='#181513', zerolinecolor='#D4CCBA',
+               tickfont=dict(color='#6F6557', family='JetBrains Mono')),
+    yaxis=dict(gridcolor='#E2DBC8', linecolor='#181513', zerolinecolor='#D4CCBA',
+               tickfont=dict(color='#6F6557', family='JetBrains Mono')),
     margin=dict(l=10, r=10, t=20, b=10),
     showlegend=False,
 )
 
-NAVY = '#1F3868'
-BLUE = '#2E5BA8'
-RED = '#C8102E'
-ORANGE = '#E37222'
-GREEN = '#0E8A6E'
-PURPLE = '#7B5BA6'
-GRAY = '#98A0AE'
+INK    = '#181513'
+RUST   = '#B5432C'
+RUST_D = '#8C2F1E'
+MOSS   = '#5A6B3D'
+AMBER  = '#C7873A'
+PLUM   = '#6B3F5F'
+SLATE  = '#4A5A6B'
+GRAY   = '#A89E8C'
+
+# Aliases kept for legacy refs in this file (so old code paths still work)
+NAVY   = INK
+BLUE   = SLATE
+RED    = RUST
+ORANGE = AMBER
+GREEN  = MOSS
+PURPLE = PLUM
 
 # =====================================================================
 # САЙДБАР
 # =====================================================================
 with st.sidebar:
     st.markdown("# Настройки")
-    st.markdown('<div style="color:var(--text-dim);font-size:0.86rem;margin-bottom:1.2rem;">Подкручивайте — таблица пересчитается.</div>', unsafe_allow_html=True)
+    st.markdown('<div style="color:var(--ink-dim);font-family:'Instrument Serif',serif;font-style:italic;font-size:0.95rem;margin-bottom:1.2rem;">Подкручивайте — таблица пересчитается.</div>', unsafe_allow_html=True)
 
     with st.expander("Хищение", expanded=True):
         cfg_theft_drop = st.slider("Падение, %", 20, 95, 50, 5) / 100
@@ -770,14 +732,20 @@ config = {
 # =====================================================================
 # ШАПКА (как обложка слайда Россети)
 # =====================================================================
-st.markdown("""
+st.markdown(f"""
 <div class="hero">
-  <h1 class="hero-title">Анализ <span class="hero-em">аномального</span><br/>потребления</h1>
-  <div class="hero-meta">
-    <span class="badge">ЭНЕРГОУЧЁТ</span><br/>
-    Реестр абонентов с флагами<br/>
-    Данные не сохраняются
+  <div class="brand">
+    <span class="brand-mark">Analyzer</span>
+    <span class="brand-tag">Энергоучёт · Россети Кубань</span>
   </div>
+  <div class="meta">
+    <span>Выпуск · <b>{pd.Timestamp.now().strftime('%d.%m.%Y')}</b></span>
+    <span>Данные не сохраняются</span>
+  </div>
+</div>
+<div class="headline">
+  <h1>Анализ <em>аномального</em> потребления</h1>
+  <div class="deck">Реестр абонентов с автоматическими флагами риска: хищения, долгое молчание ПУ, превышение мощности и нестабильность.</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -807,17 +775,17 @@ if not uploaded:
     with download_col:
         st.markdown(
             '<div style="height:100%;display:flex;align-items:center;'
-            'justify-content:center;color:var(--text-faint);font-family:JetBrains Mono;'
-            'font-size:0.7rem;text-transform:uppercase;letter-spacing:0.18em;'
-            'border:1px dashed var(--border);padding:1.2rem;text-align:center;'
-            'min-height:90px;">Отчёт появится<br/>после загрузки</div>',
+            'justify-content:center;color:var(--ink-faint);font-family:JetBrains Mono,monospace;'
+            'font-size:0.66rem;text-transform:uppercase;letter-spacing:0.2em;'
+            'border:1px dashed var(--rule);padding:1.2rem;text-align:center;'
+            'min-height:90px;background:var(--paper);">Отчёт появится<br/>после загрузки</div>',
             unsafe_allow_html=True
         )
 
     st.markdown("""
     <div class="empty-state">
-      Перетащите выгрузку выше, чтобы начать анализ
-      <span class="small">Минимум: столбцы вида «Январь 2024», «Февраль 2024»…</span>
+      «Все спокойно — пока вы не загрузите файл».
+      <span class="small">Минимум — столбцы вида «Январь 2024», «Февраль 2024»…</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -872,21 +840,21 @@ n_high_risk = int((registry['кол-во_флагов'] >= 3).sum())
 
 st.markdown(f"""
 <div class="metric-strip">
-  <div class="metric-cell" style="--cell-accent:var(--navy);">
+  <div class="metric-cell" style="--cell-accent:var(--ink);">
     <div class="metric-label">Абонентов в файле</div>
     <div class="metric-value">{report['total_rows']:,}</div>
   </div>
-  <div class="metric-cell" style="--cell-accent:var(--blue);">
+  <div class="metric-cell" style="--cell-accent:var(--slate);">
     <div class="metric-label">Месяцев данных</div>
-    <div class="metric-value blue">{report['months_detected']}</div>
+    <div class="metric-value">{report['months_detected']}</div>
   </div>
-  <div class="metric-cell" style="--cell-accent:var(--orange);">
+  <div class="metric-cell" style="--cell-accent:var(--amber);">
     <div class="metric-label">С флагами</div>
-    <div class="metric-value" style="color:var(--orange);">{n_with_flags:,}</div>
+    <div class="metric-value amber">{n_with_flags:,}</div>
   </div>
-  <div class="metric-cell" style="--cell-accent:var(--red);">
+  <div class="metric-cell" style="--cell-accent:var(--rust);">
     <div class="metric-label">Высокий риск (3+ флага)</div>
-    <div class="metric-value red">{n_high_risk:,}</div>
+    <div class="metric-value rust">{n_high_risk:,}</div>
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -906,13 +874,13 @@ with st.expander(f"Период: {report['period_range']} · что распоз
             for f in report['flags_skipped']:
                 st.markdown(
                     f'<div style="margin:0.3rem 0;font-size:0.88rem;">'
-                    f'<span class="mono" style="color:var(--blue);font-weight:500;">{f["name"]}</span> '
-                    f'<span style="color:var(--text-dim);">— {f["reason"]}</span></div>',
+                    f'<span class="mono" style="color:var(--rust);font-weight:500;">{f["name"]}</span> '
+                    f'<span style="color:var(--ink-dim);">— {f["reason"]}</span></div>',
                     unsafe_allow_html=True
                 )
         else:
             st.markdown('<div class="section-label">Все флаги вычислены</div>', unsafe_allow_html=True)
-            st.markdown('<div style="color:var(--green);font-family:JetBrains Mono;font-weight:500;">✓ полный набор</div>', unsafe_allow_html=True)
+            st.markdown('<div style="color:var(--moss);font-family:JetBrains Mono,monospace;font-weight:500;">✓ полный набор</div>', unsafe_allow_html=True)
 
 # =====================================================================
 # ВКЛАДКИ
@@ -927,8 +895,8 @@ with tab_summary:
         st.markdown('<div class="section-label">Распределение</div>', unsafe_allow_html=True)
         st.markdown('<div class="section-title">По числу флагов</div>', unsafe_allow_html=True)
         flag_counts = registry['кол-во_флагов'].value_counts().sort_index()
-        # шкала: 0—серый, 1—синий, 2—голубой, 3—оранж, 4+—красный (как svetofor)
-        scale = {0: GRAY, 1: NAVY, 2: BLUE, 3: ORANGE, 4: RED, 5: RED}
+        # шкала: 0—песок, 1—чернила, 2—мох, 3—янтарь, 4+—ржавчина
+        scale = {0: GRAY, 1: INK, 2: MOSS, 3: AMBER, 4: RUST, 5: RUST_D}
         colors = [scale.get(int(k), RED) for k in flag_counts.index]
         fig = go.Figure(go.Bar(
             x=flag_counts.index.astype(int).astype(str), y=flag_counts.values,
@@ -956,7 +924,7 @@ with tab_summary:
             textposition='outside',
             orientation='h',
             marker=dict(color=[c for _, _, c in flag_data]),
-            textfont=dict(family='JetBrains Mono', color='#1A1F2C', size=12),
+            textfont=dict(family='JetBrains Mono', color='#181513', size=12),
             hovertemplate='<b>%{y}</b><br>%{x} абонентов<extra></extra>',
         ))
         fig2.update_layout(**PLOTLY_LAYOUT, height=320,
@@ -966,12 +934,12 @@ with tab_summary:
     st.markdown('<div class="section-label">Сезонная классификация</div>', unsafe_allow_html=True)
     st.markdown('<div class="section-title">По характеру потребления</div>', unsafe_allow_html=True)
     seas = registry['сезонность'].value_counts()
-    season_color = {'круглогодичный': NAVY, 'летний (дача)': ORANGE,
-                    'зимний (отопление)': BLUE, 'нет данных': GRAY}
+    season_color = {'круглогодичный': MOSS, 'летний (дача)': AMBER,
+                    'зимний (отопление)': SLATE, 'нет данных': GRAY}
     fig3 = go.Figure(go.Bar(
         x=seas.index, y=seas.values, text=seas.values, textposition='outside',
         marker_color=[season_color.get(k, GRAY) for k in seas.index],
-        textfont=dict(family='JetBrains Mono', color='#1A1F2C', size=12),
+        textfont=dict(family='JetBrains Mono', color='#181513', size=12),
         hovertemplate='<b>%{x}</b><br>%{y} абонентов<extra></extra>',
     ))
     fig3.update_layout(**PLOTLY_LAYOUT, height=280,
@@ -1009,9 +977,9 @@ with tab_registry:
 
     st.markdown(
         f'<div style="font-family:JetBrains Mono,monospace;font-size:0.78rem;'
-        f'color:var(--text-dim);text-transform:uppercase;letter-spacing:0.14em;'
+        f'color:var(--ink-dim);text-transform:uppercase;letter-spacing:0.18em;'
         f'margin:0.5rem 0 0.8rem 0;font-weight:500;">'
-        f'Показано <span style="color:var(--red);">{len(view):,}</span> из {len(registry):,} абонентов'
+        f'Показано <span style="color:var(--rust);">{len(view):,}</span> из {len(registry):,} абонентов'
         f'</div>',
         unsafe_allow_html=True
     )
@@ -1059,11 +1027,11 @@ with tab_detail:
         fig.add_trace(go.Scatter(
             x=[p.to_timestamp() for p in periods], y=s.values,
             mode='lines+markers',
-            line=dict(color=NAVY, width=2),
-            marker=dict(size=5, color=NAVY, line=dict(color='#FFFFFF', width=1)),
+            line=dict(color=INK, width=1.6),
+            marker=dict(size=5, color=INK, line=dict(color='#FBF8F1', width=1)),
             connectgaps=False,
             fill='tozeroy',
-            fillcolor='rgba(31, 56, 104, 0.08)',
+            fillcolor='rgba(181, 67, 44, 0.10)',
             hovertemplate='<b>%{x|%b %Y}</b><br>%{y:,.0f} кВт·ч<extra></extra>',
         ))
         fig.update_layout(**PLOTLY_LAYOUT, height=400,
